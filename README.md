@@ -1,2 +1,9 @@
 # coinmarket-dashboard
-CLI-based cryptocoins market prices dashboard
+
+CLI-based crypto coins market prices dashboard
+
+## Run App
+
+```bash
+cabal run
+```
