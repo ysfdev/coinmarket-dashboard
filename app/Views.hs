@@ -55,6 +55,40 @@ printDashoard d = do
   putStrLn . unlines . interleave rowSeparator . map showRow . map addPadding . map rowNameLength $ map showCoin d
   putStrLn footer
 
+-- ##################################################################################################
+-- ######################################## Coin View ###############################################
+-- ##################################################################################################
+
+-- pretty print a coin 
+showCoinInfo :: Maybe Coin -> String
+showCoinInfo m = 
+  case m of 
+    Nothing -> "Coin not present in the database" 
+    Just c  -> "  Name:   "  ++ name c           ++ "\n" ++ 
+               "  Symbol: "  ++ symbol c         ++ "\n" ++
+               "  Price:  "  ++ show (price c)   ++ "\n" ++
+               "  24Hr %: "  ++ show (hr24Chg c) ++ "\n" ++
+               "  Rank:   "  ++ show (rank c)    
+
+-- Get a coin by ticker ID if it exists in the database
+getCoin :: String -> Maybe Coin
+getCoin ticker
+  | null coin         = Nothing 
+  | otherwise         = Just $ head coin
+    where coin = filter (\s -> symbol s == ticker) coins
+
+-- Print coin info to stdout if it exists in the database
+printCoin :: String -> IO ()
+printCoin ticker =
+  if null ticker || not (length ticker == 3) then do 
+    putStrLn ""
+    putStrLn "Please enter the ticker ID you want to query"
+    putStrLn "Usage: C <tickerID>"
+  else do 
+    putStrLn ""
+    putStrLn . showCoinInfo $ getCoin ticker
+    putStrLn ""
+    putStrLn footer
 
 -- ##################################################################################################
 -- ######################################## Helper Functions ########################################

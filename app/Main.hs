@@ -14,9 +14,13 @@ subsequentInvokes = do
   putStr "> "
   hFlush stdout
   cmd <- getLine
-  case cmd of 
-    "D" -> do printDashoard coins; subsequentInvokes
-    "C" -> do printDashoard coins; subsequentInvokes
-    "?" -> do printHelp; subsequentInvokes
-    "Q" -> return ()
-    _   -> do putStrLn "Type '?' for all available cmds"; subsequentInvokes
+  if cmd == "" then do
+    printHelp; subsequentInvokes
+  else do
+    let input = words cmd
+    case head input of
+      "D" -> do printDashoard coins; subsequentInvokes
+      "C" -> do printCoin . last $ input; subsequentInvokes
+      "?" -> do printHelp; subsequentInvokes
+      "Q" -> return ()
+      _   -> do putStrLn "\nType '?' for all available cmds"; subsequentInvokes
