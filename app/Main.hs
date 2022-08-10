@@ -15,7 +15,7 @@ subsequentInvokes = do
   hFlush stdout
   cmd <- getLine
   if cmd == "" then do
-    printHelp; subsequentInvokes
+    putStrLn "\nType '?' for all available cmds"; subsequentInvokes
   else do
     let input = words cmd
     case head input of

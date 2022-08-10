@@ -1,5 +1,8 @@
 module Views where 
 
+import qualified Data.Map as Map
+import           Data.Map (Map)
+
 -- ##################################################################################################
 -- ######################################## Help View ###############################################
 -- ##################################################################################################
@@ -26,7 +29,8 @@ type Dashboard = [Coin]
 
 -- Show a Coin as a list of Strings
 showCoin :: Coin -> [String]
-showCoin c = [name c, symbol c, show $ price c, show $ hr24Chg c, show $ rank c]
+showCoin c = [_coinName c, _coinSymbol c, show . _coinQPrice $ usdInfo, show . _coinQPercentChange24h $ usdInfo, show $ _coinCmcRank c]
+              where usdInfo = _coinQuoteMap c Map.! "USD"
 
 -- Pair strings in a list with thier corresponding lengths
 rowNameLength :: [String] -> [(String, Int)]
@@ -64,18 +68,21 @@ showCoinInfo :: Maybe Coin -> String
 showCoinInfo m = 
   case m of 
     Nothing -> "Coin not present in the database" 
-    Just c  -> "  Name:   "  ++ name c           ++ "\n" ++ 
-               "  Symbol: "  ++ symbol c         ++ "\n" ++
-               "  Price:  "  ++ show (price c)   ++ "\n" ++
-               "  24Hr %: "  ++ show (hr24Chg c) ++ "\n" ++
-               "  Rank:   "  ++ show (rank c)    
+    Just c  -> "  Name:         " ++ _coinName c                             ++ "\n" ++ 
+               "  Symbol:       " ++ _coinSymbol c                           ++ "\n" ++
+               "  Rank:         " ++ show (_coinCmcRank c)                   ++ "\n" ++   
+               "  Price:        " ++ show (_coinQPrice $ usdInfo)            ++ "\n" ++
+               "  24Hr %:       " ++ show (_coinQPercentChange24h $ usdInfo) ++ "\n" ++ 
+               "  Total Supply: " ++ show (_coinTotalSupply c)               ++ "\n" ++ 
+               "  Market Cap:   " ++ show (_coinQMarketCap $ usdInfo)  
+                where usdInfo = _coinQuoteMap c Map.! "USD"
 
 -- Get a coin by ticker ID if it exists in the database
 getCoin :: String -> Maybe Coin
 getCoin ticker
   | null coin         = Nothing 
   | otherwise         = Just $ head coin
-    where coin = filter (\s -> symbol s == ticker) coins
+    where coin = filter (\s -> _coinSymbol s == ticker) coins
 
 -- Print coin info to stdout if it exists in the database
 printCoin :: String -> IO ()
@@ -116,27 +123,94 @@ interleave x (y:ys) = y : x : interleave x ys
 -- ######################################## Sample Data #############################################
 -- ##################################################################################################
 
+{-
+     data Coin = Coin
+      {
+        _coinId :: Int
+      , _coinName :: String
+      , _coinSymbol :: String
+      , _coinSlug :: String
+      , _coinCmcRank :: Int
+      , _coinNumMarketPairs :: Int
+      , _coinCirculatingSupply :: Int
+      , _coinTotalSupply :: Int
+      , _coinMaxSupply :: Int
+      , _coinLastUpdated :: String
+      , _coinDateAdded :: String
+      , _coinTags :: [String]
+      , _coinSelfReportedCirculatingSupply :: Maybe Int
+      , _coinSelfReportedMarketCap :: Maybe Int
+      , _coinQuoteMap :: Map String CoinQuote -- keyed on the quote unit e.g. USD, BTC, etc...
+      } deriving Show
+
+     data CoinQuote = CoinQuote
+      {
+       _coinQPrice :: Double
+      , _coinQVolume24H :: Double
+      , _coinQVolumeChange24h :: Double
+      , _coinQPercentChange1h :: Double
+      , _coinQPercentChange24h :: Double
+      , _coinQPercentChange7d :: Double
+      , _coinQMarketCap :: Double
+      , _coinQMarketCapDominance :: Double
+      , _coinQFullyDilutedMarketCap :: Double
+      , _coinQLastUpdated :: String
+      } deriving Show
+-}
+
+
+data CoinQuote = CoinQuote
+  {
+    _coinQPrice :: Double,
+    _coinQPercentChange24h :: Double,
+    _coinQMarketCap :: Int
+  } deriving Show
+
 data Coin = Coin 
   {
-    name    :: String, 
-    symbol  :: String,
-    price   :: Float,
-    hr24Chg :: Float,
-    rank    :: Int
+    _coinName    :: String, 
+    _coinSymbol  :: String,
+    _coinCmcRank    :: Int,
+    _coinTotalSupply :: Int,
+    _coinQuoteMap :: Map String CoinQuote
   }
   deriving Show
 
+btcUsdtQuote :: CoinQuote 
+btcUsdtQuote = CoinQuote 24500.05 7.3 456853370715
+
+adaUsdtQuote :: CoinQuote 
+adaUsdtQuote = CoinQuote 0.5 2.6 18049512381
+
+ethUsdtQuote :: CoinQuote 
+ethUsdtQuote = CoinQuote 18200.42 12.1 223036692722
+
+solUsdtQuote :: CoinQuote 
+solUsdtQuote = CoinQuote 42.1 5.9 14654722328
+
+btcMap :: Map String CoinQuote
+btcMap = Map.fromList [("USD", btcUsdtQuote)]
+
+adaMap :: Map String CoinQuote
+adaMap = Map.fromList [("USD", adaUsdtQuote)]
+
+ethMap :: Map String CoinQuote
+ethMap = Map.fromList [("USD", ethUsdtQuote)]
+
+solMap :: Map String CoinQuote
+solMap = Map.fromList [("USD", solUsdtQuote)]
+
 coin1 :: Coin 
-coin1 = Coin "Bitcoin" "BTC" 23000.2 5.2 1
+coin1 = Coin "Bitcoin" "BTC" 1 19117693 btcMap
 
 coin2 :: Coin 
-coin2 = Coin "Cardano" "ADA" 0.5 2.3 5
+coin2 = Coin "Cardano" "ADA" 7 42752565071 adaMap
 
 coin3 :: Coin 
-coin3 = Coin "Etherium" "ETH" 1525.3 10.1 2
+coin3 = Coin "Etherium" "ETH" 2 121906640 ethMap
 
 coin4 :: Coin 
-coin4 = Coin "Solana" "SOL" 38.5 4.6 9
+coin4 = Coin "Solana" "SOL" 9 348408611 solMap
 
 coins :: Dashboard 
 coins = [coin1, coin2, coin3, coin4]
