@@ -1,6 +1,7 @@
 module Main where 
 
 import System.IO
+import Data.Char
 import Views 
 
 main :: IO ()
@@ -17,10 +18,10 @@ subsequentInvokes = do
   if cmd == "" then do
     putStrLn "\nType '?' for all available cmds"; subsequentInvokes
   else do
-    let input = words cmd
+    let input = words $ map toLower cmd
     case head input of
-      "D" -> do printDashoard coins; subsequentInvokes
-      "C" -> do printCoin . last $ input; subsequentInvokes
+      "d" -> do printDashoard coins; subsequentInvokes
+      "c" -> do printCoin . last $ input; subsequentInvokes
       "?" -> do printHelp; subsequentInvokes
-      "Q" -> return ()
+      "q" -> return ()
       _   -> do putStrLn "\nType '?' for all available cmds"; subsequentInvokes

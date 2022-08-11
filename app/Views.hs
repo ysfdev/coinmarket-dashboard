@@ -2,6 +2,7 @@ module Views where
 
 import qualified Data.Map as Map
 import           Data.Map (Map)
+import           Data.Char
 
 -- ##################################################################################################
 -- ######################################## Help View ###############################################
@@ -59,6 +60,25 @@ printDashoard d = do
   putStrLn . unlines . interleave rowSeparator . map showRow . map addPadding . map rowNameLength $ map showCoin d
   putStrLn footer
 
+{-
+
+-- for integration with top10Coins from DB module
+
+printDashoardNew :: IO ()
+printDashoardNew d = do
+  topCoins <- top10Coins
+  putStrLn ""
+  case topCoins of 
+    GcrNotFoundError    -> putStrLn "Unexpected Database Error"
+    GcrUnexpectedError  -> putStrLn "Unexpected Server Error"
+    GcrCoinList         -> do
+      putStrLn . showRow . addPadding $ rowNameLength header
+      putStrLn rowSeparator
+      putStrLn . unlines . interleave rowSeparator . map showRow . map addPadding . map rowNameLength $ map showCoin topCoins
+      putStrLn footer
+
+-}
+
 -- ##################################################################################################
 -- ######################################## Coin View ###############################################
 -- ##################################################################################################
@@ -82,7 +102,7 @@ getCoin :: String -> Maybe Coin
 getCoin ticker
   | null coin         = Nothing 
   | otherwise         = Just $ head coin
-    where coin = filter (\s -> _coinSymbol s == ticker) coins
+    where coin = filter (\s -> _coinSymbol s == (map toUpper ticker)) coins
 
 -- Print coin info to stdout if it exists in the database
 printCoin :: String -> IO ()
@@ -96,6 +116,44 @@ printCoin ticker =
     putStrLn . showCoinInfo $ getCoin ticker
     putStrLn ""
     putStrLn footer
+
+{-
+
+-- for integration with coinLookUp from DB module
+
+showCoinInfoNew :: Coin -> String
+showCoinInfoNew m = 
+               "  Name:         " ++ _coinName c                             ++ "\n" ++ 
+               "  Symbol:       " ++ _coinSymbol c                           ++ "\n" ++
+               "  Rank:         " ++ show (_coinCmcRank c)                   ++ "\n" ++   
+               "  Price:        " ++ show (_coinQPrice $ usdInfo)            ++ "\n" ++
+               "  24Hr %:       " ++ show (_coinQPercentChange24h $ usdInfo) ++ "\n" ++ 
+               "  Total Supply: " ++ show (_coinTotalSupply c)               ++ "\n" ++ 
+               "  Market Cap:   " ++ show (_coinQMarketCap $ usdInfo)  
+                where usdInfo = _coinQuoteMap c Map.! "USD"
+
+getCoinNew :: String -> IO CoinLookupResult
+getCoinNew ticker = do 
+  let params = CoinLookupParams (map toUpper ticker) ... 
+  coin <- coinLookUp params 
+
+printCoinNew :: String -> IO ()
+printCoinNew ticker =
+  if null ticker || not (length ticker == 3) then do 
+    putStrLn ""
+    putStrLn "Please enter the ticker ID you want to query"
+    putStrLn "Usage: C <tickerID>"
+  else do 
+    coin <- getCoinNew ticker
+    putStrLn ""
+    case coin of 
+      ClrNotFoundError    -> putStrLn $ "Coin with ticker " ++ ticker ++ " not present in the database"
+      ClrUnexpectedError  -> putStrLn "Unexpected Server Error"
+      ClrCoin             -> do
+        putStrLn . showCoinInfoNew coin
+        putStrLn ""
+        putStrLn footer
+-}
 
 -- ##################################################################################################
 -- ######################################## Helper Functions ########################################
