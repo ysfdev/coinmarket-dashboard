@@ -31,8 +31,8 @@ fetchLatestListings :: QueryParams -> IO DataResponse
 fetchLatestListings q =
   fetchData
     ReqParams
-      { host = coinMarketSandboxAPIServerHost,
-        apiKey = coinMarketSandboxAPIKey,
+      { host = coinMarketAPIServerHost,
+        apiKey = coinMarketAPIKey,
         endpoint = cryptoLatestListingsEndpoint,
         query = q
       }
