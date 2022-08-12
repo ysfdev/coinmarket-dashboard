@@ -21,6 +21,7 @@ import MarketDataClientTypes
 import Network.HTTP.Client.Conduit (HttpException)
 import qualified Network.HTTP.Conduit as Http
 import qualified Network.HTTP.Simple as Http
+import Control.Applicative (Alternative(empty))
 
 buildReqQ :: RStart -> Limit -> QueryParams
 buildReqQ s l = QueryParams {start = s, limit = l}
@@ -82,4 +83,4 @@ rLimit QueryParams {limit = l}
 reqExHandler :: SomeException -> IO DataResponse
 reqExHandler err = do
   putStrLn $ "Error sending request: " ++ show err
-  return DataResponse {status = FailToSendReq, message = show err, body = []}
+  return DataResponse {status = FailToSendReq, message = show err, body = empty}

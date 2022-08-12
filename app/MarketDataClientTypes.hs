@@ -11,6 +11,7 @@ import qualified GHC.Exts as Aeson
 import Network.HTTP.Client.Conduit (HttpException)
 import qualified Network.HTTP.Conduit as Http
 import qualified Network.HTTP.Simple as Http
+import Control.Applicative (Alternative(empty))
 
 -- CoinMarketCap API Details
 -- Hosts ---
@@ -70,20 +71,21 @@ data Status
 data DataResponse = DataResponse
   { status :: Status,
     message :: Message, --- (error_message from API response)
-    body :: [Value] -- API response.data body
+    body :: Array  -- API response.data body
   }
   deriving (Show)
 
 data APIResponse = APIResponse
   { rmessage :: Message,
-    rdata :: [Value]
+    rdata :: Array
   }
   deriving (Show)
 
 instance FromJSON APIResponse where
   parseJSON (Object v) = do
-    data' <- v .: "data"
+    data' <- v .:? "data" .!= empty
     -- TODO extract status.error_message
-    -- message' <- v .: "status"
+    -- status' <- v .:? "status" .!= Object
+    -- msg'  <- status' .:? "error_message"
     return $ APIResponse {rdata = data', rmessage = ""}
   parseJSON _ = mzero
