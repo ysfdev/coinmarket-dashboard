@@ -174,6 +174,6 @@ top10Coins = let
     Just o -> parseMaybe (.: toKey "data") o :: Maybe Array
     _ -> Nothing in case a of
   Just a -> case V.mapM (parseMaybe (parseJSON @Coin)) a of
-    Just va -> return $ GcrCoinList va
+    Just va -> return $ GcrCoinList (V.take 10 va)
     Nothing -> return $ GcrCoinList V.empty
   _ -> return $ GcrCoinList V.empty
