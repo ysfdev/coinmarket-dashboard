@@ -1,10 +1,8 @@
 -- import Database.Sqlite
 -- import Data.Text
 
-{-# LANGUAGE
-  QuasiQuotes
-, TypeApplications
-#-}
+{-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE TypeApplications #-}
 
 module TestCoinDataStorage where
 
@@ -27,11 +25,21 @@ create table if not exists coindata
 ,self_reported_market_cap integer);
 |]
 
+_createCoinDataIndexes = [qq|
+create index idx_coinname on coindata (name);
+create index idx_coinsymbol on coindata (symbol);
+create index idx_coinslug on coindata (slug);
+create index idx_coincsupply on coindata (circulating_supply);
+create index idx_cointotalsupply on coindata (total_supply);
+create index idx_coinmaxsupply on coindata (max_supply);
+create index idx_coinlastupdated on coindata (last_updated);
+create unique index idx_coinrank on coindata (cmc_rank);
+|]
 
 _createQuoteDataTable = [qq|
 create table if not exists quotedata
-(price integer
-,volume_24h integer
+(price double
+,volume_24h double
 ,volume_change_24h double
 ,percent_change_1h double
 ,percent_change_24h double
@@ -42,13 +50,45 @@ create table if not exists quotedata
 ,last_updated text
 ,id integer not null
 ,unit text not null
-,foreign key (id) references coindata (id));
+,primary key (id, unit)
+,foreign key (id) references coindata (id) on delete cascade on update cascade);
 |]
 
-_initializeDatabaseScript = "begin transaction;"
--- <> _createCoinDataTable
--- <> _createQuoteDataTable ++ "commit;"
+_createQuoteDataIndexes = [qq|
+create index idx_quotecoin on quotedata (id);
+create index idx_quoteunit on quotedata (unit);
+create index idx_quotelastupdated on quotedata (last_updated);
+create unique index idx_quotecoinprice on quotedata (id, unit, price);
+create unique index idx_quotevol24h on quotedata (id, unit, volume_change_24h);
+create unique index idx_quotevol1h on quotedata (id, unit, volume_change_1h);
+create unique index idx_quotevol7d on quotedata (id, unit, volume_change_7dh);
+create unique index idx_quotemc on quotedata (id, unit, market_cap);
+create unique index idx_quotemcdom on quotedata (id, unit, market_cap_dominance);
+create unique index idx_quotedilutedmc on quotedata (id, unit, diluted_market_cap);
+|]
 
+_createIndexes = ""
+
+_createTables = _createCoinDataTable <> _createQuoteDataTable
+
+_clearTables = [qq|
+delete from coindata;
+delete from quotedata;
+|]
+
+_initPrologue = [qq|
+/* Database initialization Prologue */
+pragma foreign_keys = ON; /*turn on foreign key constraints*/
+|]
+
+_initBody = "/* Database initialization Prologue */\n"
+  <> _createTables
+
+_initEpillogue = [qq|
+/*Database initialization epilogue*/
+|]
+
+_initDB = _initPrologue <> _initBody <> _initEpillogue
 
 {-
 PRAGMA foreign_keys=off;

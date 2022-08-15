@@ -98,8 +98,8 @@ data Coin = Coin
   , _coinLastUpdated :: String
   , _coinDateAdded :: String
   , _coinTags :: [String]
-  , _coinSelfReportedCirculatingSupply :: Maybe Int
-  , _coinSelfReportedMarketCap :: Maybe Int
+  , _coinSelfReportedCirculatingSupply :: Maybe Double
+  , _coinSelfReportedMarketCap :: Maybe Double
   , _coinQuoteMap :: Map String CoinQuote -- keyed on the quote unit e.g. USD, BTC, etc...
   } deriving (Show)
 
@@ -152,7 +152,7 @@ data GetCoinsParams = GetCoinsParams
   , _tcpFilterBy :: Maybe CoinProperty
   }
 
-data GetCoinsResult = GcrCoinList | GcrNotFoundError | GcrUnexpectedError
+data GetCoinsResult = GcrCoinList {getList :: Vector Coin} | GcrNotFoundError | GcrUnexpectedError deriving Show
 
 
 ----- =============== End Pure Code =============== -----
@@ -168,4 +168,12 @@ getCoins _ = return GcrNotFoundError
 
 -- Fetch the top ten coins from the local store
 top10Coins :: IO GetCoinsResult
-top10Coins = getCoins $ GetCoinsParams (Just 10) Nothing Nothing
+-- top10Coins = getCoins $ GetCoinsParams (Just 10) Nothing Nothing
+top10Coins = let 
+  a = case decode (toBStr _sampleCoinListData) of 
+    Just o -> parseMaybe (.: toKey "data") o :: Maybe Array
+    _ -> Nothing in case a of
+  Just a -> case V.mapM (parseMaybe (parseJSON @Coin)) a of
+    Just va -> return $ GcrCoinList va
+    Nothing -> return $ GcrCoinList V.empty
+  _ -> return $ GcrCoinList V.empty

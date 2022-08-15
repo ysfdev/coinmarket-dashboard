@@ -39,10 +39,14 @@ executable coinmarket-dashboard
         CoinDataStorage
         CoinDataSample
         TestCoinData
-        -- TestCoinDataStorage
+        TestCoinDataStorage
 
     -- LANGUAGE extensions used by modules in this package.
-    -- other-extensions:
+    other-extensions:
+        QuasiQuotes
+        TypeApplications
+        OverloadedStrings
+
     build-depends:
          aeson ^>=2.1.0.0
         ,base ^>=4.14.3.0
