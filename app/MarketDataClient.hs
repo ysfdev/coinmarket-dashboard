@@ -51,8 +51,9 @@ doMarketReq rp = do
           (fromString "Accept-Encoding")
           (fromString "deflate, gzip")
         request'
-  print $ "Sending new market API request to: " ++ rHost rp ++ "" ++ rEndpoint rp
-  print request
+  -- Could we make an option to enable this logging only for test code? -- KJM
+  -- print $ "Sending new market API request to: " ++ rHost rp ++ "" ++ rEndpoint rp
+  -- print request
   response <- Http.httpJSON request
-  putStrLn $ "Response status code: " ++ show (Http.getResponseStatusCode response)
+  -- putStrLn $ "Response status code: " ++ show (Http.getResponseStatusCode response)
   return response

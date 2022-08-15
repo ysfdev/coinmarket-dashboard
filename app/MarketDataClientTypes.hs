@@ -66,7 +66,7 @@ data Status
   | TooManyRequests
   | RequestRedirected
   | FailToSendReq
-  deriving (Show)
+  deriving (Show, Eq)
 
 data DataResponse = DataResponse
   { status :: Status,
