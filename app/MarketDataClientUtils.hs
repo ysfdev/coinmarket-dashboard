@@ -21,9 +21,10 @@ import MarketDataClientTypes
 import Network.HTTP.Client.Conduit (HttpException)
 import qualified Network.HTTP.Conduit as Http
 import qualified Network.HTTP.Simple as Http
-import Control.Applicative (Alternative(empty))
+import qualified Data.Vector as V
+import Data.Maybe (isNothing)
 
-buildReqQ :: RStart -> Limit -> QueryParams
+buildReqQ :: RStart -> RLimit -> QueryParams
 buildReqQ s l = QueryParams {start = s, limit = l}
 
 -- resStatus extracts the Status of Http Response
@@ -70,11 +71,9 @@ rEndpoint rp
 
 -- rqParams extracts and parses request query strings
 rqQueryStr :: ReqParams -> Http.Query
-rqQueryStr ReqParams {query = q} = [("limit", Just l)]
-  where
-    l = fromString . show $ rLimit q
+rqQueryStr ReqParams {query = q} = [("limit", Just $ fromString . show $ rLimit q)]
 
-rLimit :: QueryParams -> Limit
+rLimit :: QueryParams -> RLimit
 rLimit QueryParams {limit = l}
   | l > 0 = l
   | otherwise = 100
@@ -83,4 +82,4 @@ rLimit QueryParams {limit = l}
 reqExHandler :: SomeException -> IO DataResponse
 reqExHandler err = do
   putStrLn $ "Error sending request: " ++ show err
-  return DataResponse {status = FailToSendReq, message = show err, body = empty}
+  return DataResponse {status = FailToSendReq, message = show err, body = V.empty}
