@@ -25,6 +25,9 @@ import qualified Data.Vector as V
 import Data.Maybe (isNothing)
 
 buildReqQ :: RStart -> RLimit -> QueryParams
+import Control.Applicative (Alternative(empty))
+
+buildReqQ :: RStart -> Limit -> QueryParams
 buildReqQ s l = QueryParams {start = s, limit = l}
 
 -- resStatus extracts the Status of Http Response

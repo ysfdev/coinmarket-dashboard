@@ -51,8 +51,9 @@ doMarketReq rp = do
           (fromString "Accept-Encoding")
           (fromString "deflate, gzip")
         request'
-  print $ "Sending new market API request to: " ++ rHost rp ++ "" ++ rEndpoint rp
-  print request
+  -- TODO: Make enabling logs configurable
+  -- putStrln $ "Sending new market API request to: " ++ rHost rp ++ "" ++ rEndpoint rp
+  -- print request
   response <- Http.httpJSON request
-  putStrLn $ "Response status code: " ++ show (Http.getResponseStatusCode response)
+  -- putStrLn $ "Response status code: " ++ show (Http.getResponseStatusCode response)
   return response
