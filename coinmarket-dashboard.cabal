@@ -38,6 +38,7 @@ executable coinmarket-dashboard
         CoinDataUtils
         CoinDataStorage
         CoinDataSample
+        Views
         TestCoinData
         TestCoinDataStorage
 

@@ -11,7 +11,9 @@ module CoinData
 , CoinProperty (..)
 , CoinLookupParams (..)
 , CoinLookupResult (..)
+, GetCoinsResult (..)
 , coinLookUp
+, top10Coins
 ) where
 
 import Data.Map
