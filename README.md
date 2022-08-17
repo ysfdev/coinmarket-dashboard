@@ -7,3 +7,17 @@ CLI-based crypto coins market prices dashboard
 ```bash
 cabal run
 ```
+
+## Testing
+
+### Install and configure unit test
+
+```bash
+cabal install && cabal configure --enable-tests
+```
+
+### Run Uni Tests
+
+```bash
+cabal test
+```

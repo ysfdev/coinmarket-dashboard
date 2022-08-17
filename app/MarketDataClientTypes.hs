@@ -1,5 +1,4 @@
 {-# LANGUAGE OverloadedStrings #-}
-
 module MarketDataClientTypes where
 
 import Control.Exception (SomeException (SomeException), handle)
@@ -11,16 +10,13 @@ import qualified GHC.Exts as Aeson
 import Network.HTTP.Client.Conduit (HttpException)
 import qualified Network.HTTP.Conduit as Http
 import qualified Network.HTTP.Simple as Http
-import Control.Applicative (Alternative(empty))
+import qualified Data.Vector as V
 
 -- CoinMarketCap API Details
 -- Hosts ---
 coinMarketAPIServerHost = "https://pro-api.coinmarketcap.com"
-
-coinMarketSandboxAPIServerHost = "https://sandbox-api.coinmarketcap.com"
-
 coinMarketAPIKey = "882a4874-8e57-4674-8b9d-7509be621718"
-
+coinMarketSandboxAPIServerHost = "https://sandbox-api.coinmarketcap.com"
 coinMarketSandboxAPIKey = "b54bcf4d-1bca-4e8e-9a24-22ff2c3d462c"
 
 -- Endpoints --
@@ -39,7 +35,7 @@ type Message = String
 
 type RawReqBody = String
 
-type Limit = Int
+type RLimit = Int
 
 type RStart = Int
 
@@ -47,15 +43,15 @@ data QueryParams = QueryParams
   { -- start allows to offset the start (1-based index) of the paginated list of items to return.
     start :: RStart,
     -- limit allows to specify the number of results to return. Default: 100
-    limit :: Limit
-  }
+    limit :: RLimit
+  } deriving (Show, Eq)
 
 data ReqParams = ReqParams
   { host :: Host,
     endpoint :: Endpoint,
-    query :: QueryParams,
-    apiKey :: APIKey
-  }
+    apiKey :: APIKey,
+    query :: QueryParams
+  } deriving (Show, Eq)
 
 data Status
   = Successful
@@ -83,7 +79,7 @@ data APIResponse = APIResponse
 
 instance FromJSON APIResponse where
   parseJSON (Object v) = do
-    data' <- v .:? "data" .!= empty
+    data' <- v .:? "data" .!= V.empty
     -- TODO extract status.error_message
     -- status' <- v .:? "status" .!= Object
     -- msg'  <- status' .:? "error_message"
