@@ -41,6 +41,7 @@ executable coinmarket-dashboard
         base ^>=4.14.3.0,
         http-conduit ^>=2.3.8,
         aeson ^>=2.1.0.0,
+        async ^>=2.2.4,
         vector
     hs-source-dirs:   app
     other-modules:
@@ -51,6 +52,7 @@ executable coinmarket-dashboard
         CoinDataUtils
         CoinDataStorage
         CoinDataSample
+        DataRefresher
         Views
         TestCoinData
         TestCoinDataStorage
