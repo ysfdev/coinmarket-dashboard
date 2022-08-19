@@ -1,24 +1,31 @@
 module Views where 
 
+import qualified Control.Concurrent as C
 import qualified Data.Map as Map
 import           Data.Map (Map)
 import           Data.Vector (Vector)
 import qualified Data.Vector as V
 import           Data.Char
+import           Text.Printf
 import           CoinData
 import qualified DataRefresher as DR
-
-data ViewName = Dashboard | CoinLookUp | HelpMenu deriving (Show, Eq)
 
 -- ##################################################################################################
 -- ######################################## Help View ###############################################
 -- ##################################################################################################
 
 renderCurrentView :: DR.MContext -> IO ()
-renderCurrentView ctx = do 
+renderCurrentView ctx = do
   -- TODO: @Andres implement logic to render view based on the ctx.currentView
   -- Use System.Console.ANSI to clear screen after each view rendering
-  printHelp
+  c <- C.takeMVar ctx
+  case DR.currentView c of 
+    DR.Dashboard     -> do 
+      printDashoardNew
+      printHelp
+    DR.CoinLookUp    -> putStrLn "Coin View"
+    DR.HelpMenu      -> printHelp
+  C.putMVar ctx c
 
 
 printHelp :: IO ()
@@ -43,7 +50,7 @@ type Dashboard = [Coin]
 
 -- Show a Coin as a list of Strings
 showCoin :: Coin -> [String]
-showCoin c = [_coinName c, _coinSymbol c, show . _coinQPrice $ usdInfo, show . _coinQPercentChange24h $ usdInfo, show $ _coinCmcRank c]
+showCoin c = [_coinName c, _coinSymbol c, roundToStr 2 (_coinQPrice $ usdInfo), roundToStr 2 (_coinQPercentChange24h $ usdInfo), show $ _coinCmcRank c]
               where usdInfo = _coinQuoteMap c Map.! "USD"
 
 -- Pair strings in a list with thier corresponding lengths
@@ -187,6 +194,13 @@ interleave x []     = []
 interleave x [y]    = [y]
 interleave x (y:ys) = y : x : interleave x ys
 
+-- clear the screen
+clear :: IO ()
+clear = putStr "\ESC[2J"
+
+-- truncate decimal places
+roundToStr :: (PrintfArg a, Floating a) => Int -> a -> String
+roundToStr = printf "%0.*f"
 
 -- ##################################################################################################
 -- ######################################## Sample Data #############################################
