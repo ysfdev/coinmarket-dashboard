@@ -6,10 +6,20 @@ import           Data.Vector (Vector)
 import qualified Data.Vector as V
 import           Data.Char
 import           CoinData
+import qualified DataRefresher as DR
+
+data ViewName = Dashboard | CoinLookUp | HelpMenu deriving (Show, Eq)
 
 -- ##################################################################################################
 -- ######################################## Help View ###############################################
 -- ##################################################################################################
+
+renderCurrentView :: DR.MContext -> IO ()
+renderCurrentView ctx = do 
+  -- TODO: @Andres implement logic to render view based on the ctx.currentView
+  -- Use System.Console.ANSI to clear screen after each view rendering
+  printHelp
+
 
 printHelp :: IO ()
 printHelp = do 

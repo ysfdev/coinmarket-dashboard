@@ -15,6 +15,7 @@ import qualified Data.Vector as V
 -- CoinMarketCap API Details
 -- Hosts ---
 coinMarketAPIServerHost = "https://pro-api.coinmarketcap.com"
+coinMarketAPIKey :: [Char]
 coinMarketAPIKey = "882a4874-8e57-4674-8b9d-7509be621718"
 coinMarketSandboxAPIServerHost = "https://sandbox-api.coinmarketcap.com"
 coinMarketSandboxAPIKey = "b54bcf4d-1bca-4e8e-9a24-22ff2c3d462c"
