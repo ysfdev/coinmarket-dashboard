@@ -7,6 +7,7 @@ import qualified Data.Vector as V
 import           Data.Char
 import           CoinData
 import qualified DataRefresher as DR
+import qualified Control.Concurrent as C
 
 data ViewName = Dashboard | CoinLookUp | HelpMenu deriving (Show, Eq)
 
@@ -14,11 +15,12 @@ data ViewName = Dashboard | CoinLookUp | HelpMenu deriving (Show, Eq)
 -- ######################################## Help View ###############################################
 -- ##################################################################################################
 
-renderCurrentView :: DR.MContext -> IO ()
+renderCurrentView :: DR.VContext -> IO ()
 renderCurrentView ctx = do 
   -- TODO: @Andres implement logic to render view based on the ctx.currentView
-  -- Use System.Console.ANSI to clear screen after each view rendering
-  printHelp
+  c <- DR.readVCtx ctx
+  printDashoardNew $ DR.topCoins c
+  printHelp -- TODO: render horizantal helpMenu instead
 
 
 printHelp :: IO ()
@@ -76,9 +78,8 @@ printDashoard d = do
 
 -- for integration with top10Coins from DB module
 
-printDashoardNew :: IO ()
-printDashoardNew = do
-  topCoins <- top10Coins
+printDashoardNew :: GetCoinsResult -> IO ()
+printDashoardNew topCoins = do
   putStrLn ""
   case topCoins of 
     GcrNotFoundError    -> putStrLn "Unexpected Database Error"
