@@ -16,7 +16,7 @@ module CoinData
 , top10Coins
 ) where
 
-import Data.Map
+import Data.Map (Map)
 import Data.Vector (Vector)
 import qualified Data.Vector as V
 import Data.Maybe
@@ -24,9 +24,8 @@ import Data.Aeson
 import Data.Aeson.Types
 
 import CoinDataUtils
+import CoinDataTypes
 import CoinDataSample
-import CoinDataTypes ( Coin(..), CoinProperty(..) )
-
 import MarketDataClient
 
 -- coinQuoteFromJSON :: String -> Maybe CoinQuote
@@ -69,7 +68,16 @@ data GetCoinsResult = GcrCoinList {_gcrGetList :: Vector Coin} | GcrNotFoundErro
 
 -- Should perform full text search look up on local coin data store based on _coinSlug (coin name)
 coinLookUp :: CoinLookupParams -> IO CoinLookupResult
-coinLookUp _ = return ClrNotFoundError
+-- coinLookUp _ = return ClrNotFoundError
+coinLookUp _ = let  
+  a = case decode (toBStr _sampleCoinListData) of 
+    Just o -> parseMaybe (.:: "data") o :: Maybe (Vector Coin)
+    _ -> Nothing in 
+  case a of
+    Just va ->
+      if not $ null va then return $ ClrCoin $ Just $ V.head va
+      else return ClrNotFoundError
+    _ -> return ClrNotFoundError
 
 -- Fetch from DB
 getCoins :: GetCoinsParams -> IO GetCoinsResult
@@ -90,6 +98,7 @@ top10Coins :: IO GetCoinsResult
 top10Coins = let 
   a = case decode (toBStr _sampleCoinListData) of 
     Just o -> parseMaybe (.:: "data") o :: Maybe (Vector Coin)
-    _ -> Nothing in case a of
-  Just va -> return $ GcrCoinList $ V.take 10 va
-  _ -> return GcrUnexpectedError
+    _ -> Nothing in
+  case a of
+    Just va -> return $ GcrCoinList $ V.take 10 va
+    _ -> return GcrUnexpectedError
