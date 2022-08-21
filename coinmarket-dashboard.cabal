@@ -53,6 +53,7 @@ executable coinmarket-dashboard
         MarketDataClientTypes
         CoinData
         CoinDataUtils
+        CoinDataTypes
         CoinDataStorage
         CoinDataSample
         DataRefresher
