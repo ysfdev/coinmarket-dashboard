@@ -57,16 +57,16 @@ data CoinProperty
 
 data CoinQuote = CoinQuote
   {
-   _coinQPrice :: Double
-  , _coinQVolume24H :: Double
-  , _coinQVolumeChange24h :: Double
-  , _coinQPercentChange1h :: Double
-  , _coinQPercentChange24h :: Double
-  , _coinQPercentChange7d :: Double
-  , _coinQMarketCap :: Double
-  , _coinQMarketCapDominance :: Double
-  , _coinQFullyDilutedMarketCap :: Double
-  , _coinQLastUpdated :: String
+   _coinQPrice :: Either String Double
+  , _coinQVolume24H :: Either String Double
+  , _coinQVolumeChange24h :: Either String Double
+  , _coinQPercentChange1h :: Either String Double
+  , _coinQPercentChange24h :: Either String Double
+  , _coinQPercentChange7d :: Either String Double
+  , _coinQMarketCap :: Either String Double
+  , _coinQMarketCapDominance :: Either String Double
+  , _coinQFullyDilutedMarketCap :: Either String Double
+  , _coinQLastUpdated :: Either String String
   } deriving Show
 
 instance FromJSON CoinQuote where
@@ -83,26 +83,28 @@ instance FromJSON CoinQuote where
     <*> annotatedParser v "fully_diluted_market_cap"
     <*> annotatedParser v "last_updated"
 
-coinQuoteFromJSON :: String -> Maybe CoinQuote
-coinQuoteFromJSON s = decode $ toBStr s
+coinQuoteFromJSON :: Either String String -> Maybe CoinQuote
+coinQuoteFromJSON s = case s of
+  Left err -> Nothing
+  Right pass -> decode $ toBStr pass
 
 data Coin = Coin
   {
-    _coinId :: Int
-  , _coinName :: String
-  , _coinSymbol :: String
-  , _coinSlug :: String
-  , _coinCmcRank :: Int
-  , _coinNumMarketPairs :: Int
-  , _coinCirculatingSupply :: Double
-  , _coinTotalSupply :: Double
-  , _coinMaxSupply :: Double
-  , _coinLastUpdated :: String
-  , _coinDateAdded :: String
-  , _coinTags :: [String]
-  , _coinSelfReportedCirculatingSupply :: Maybe Double
-  , _coinSelfReportedMarketCap :: Maybe Double
-  , _coinQuoteMap :: Map String CoinQuote -- keyed on the quote unit e.g. USD, BTC, etc...
+    _coinId :: Either String Int
+  , _coinName :: Either String String
+  , _coinSymbol :: Either String String
+  , _coinSlug :: Either String String
+  , _coinCmcRank :: Either String Int
+  , _coinNumMarketPairs :: Either String Int
+  , _coinCirculatingSupply :: Either String Double
+  , _coinTotalSupply :: Either String Double
+  , _coinMaxSupply :: Either String Double
+  , _coinLastUpdated :: Either String String
+  , _coinDateAdded :: Either String String
+  , _coinTags :: Either String [String]
+  , _coinSelfReportedCirculatingSupply :: Either String Double
+  , _coinSelfReportedMarketCap :: Either String Double
+  , _coinQuoteMap :: Either String (Map String CoinQuote) -- keyed on the quote unit e.g. USD, BTC, etc...
   } deriving (Show)
 
 instance Eq Coin where
