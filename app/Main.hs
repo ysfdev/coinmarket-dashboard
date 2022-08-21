@@ -77,7 +77,7 @@ inputLoop ctx = do
     case head input of
       "d" -> do DR.updateCurrentView DR.Dashboard ctx
       "c" -> do DR.updateCurrentView DR.CoinLookUp ctx
-      "?" -> do DR.updateCurrentView DR.HelpMenu ctx
+      "?" -> do DR.updateCurrentView DR.Help ctx
       "q" -> exitSuccess
     
       _   -> do C.forkIO $ DR.setErrorMessage "Type '?' for all available cmds" ctx; return ()

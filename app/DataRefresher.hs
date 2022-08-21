@@ -9,7 +9,7 @@ import qualified CoinData as CD
 import qualified CoinDataStorage as CDS
 import CoinData (GetCoinsResult)
 
-data ViewName = Dashboard | CoinLookUp | HelpMenu deriving (Show, Eq)
+data ViewName = Dashboard | CoinLookUp | Help deriving (Show, Eq)
 type RefreshInterval = Int
 
 type MContext = M.MVar Context
