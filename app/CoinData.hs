@@ -27,6 +27,7 @@ import CoinDataUtils
 import CoinDataSample
 
 import MarketDataClient
+import CoinData (CoinLookupParams(_clpCoinSymbol))
 
 data CoinProperty
   = CoinId
@@ -140,12 +141,14 @@ coinFromJSON s = decode $ toBStr s
 
 data CoinLookupParams = CoinLookupParams 
   {
-    _clpCoinName :: Maybe String  -- (text search based on slug)
+    _clpCoinName :: Maybe String  -- (text search based on name)
+  , _clpCoinSymbol :: Maybe String -- (text search based on ticker)
+  , _clpCoinSlug :: Maybe String -- (text search based on slug)
   , _clpCoinId :: Maybe Int
   , _clpCoinCmcRank :: Maybe Int
   }
 
-data CoinLookupResult = ClrCoin | ClrNotFoundError | ClrUnexpectedError
+data CoinLookupResult = ClrCoin {getCoin :: Maybe Coin} | ClrNotFoundError | ClrUnexpectedError
 
 data GetCoinsParams = GetCoinsParams
   {
