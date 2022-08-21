@@ -16,12 +16,12 @@ import qualified CoinData as CD
 import qualified DataRefresher as DR
 import qualified Views
 import DataRefresher (RefreshInterval)
+import GHC.IO.Handle (hFlush)
 
 main :: IO ()
 main = do
   IO.hSetBuffering IO.stdout IO.NoBuffering 
-  -- TODO: clear stdin buffering
-  -- IO.hSetBuffering IO.stdin IO.NoBuffering 
+  IO.hSetBuffering IO.stdin IO.NoBuffering 
   putStrLn "Welcome, CoinMarket Dashboard"
     -- storage <- CDS.init 
     -- topCoins <- CD.top10Coins ctx.store
@@ -29,7 +29,8 @@ main = do
   vCtx <- STM.atomically $ T.newTVar DR.ViewsContext {
     DR.topCoins=topCoins,
     DR.currentView=DR.Dashboard,
-    DR.errorMessage=""
+    DR.errorMessage="",
+    DR.searchStr=""
   }
   mCtx <- C.newMVar DR.Context {
     DR.vContext=vCtx,
@@ -52,7 +53,7 @@ mainLoop ctx ri = do
 viewsLoop :: DR.VContext -> IO ()
 viewsLoop ctx = do
   IO.hFlush IO.stdout
-  ANSI.clearScreen
+  ANSI.clearFromCursorToScreenBeginning
   Views.renderCurrentView ctx
   C.threadDelay (round (10 ^ 6)) -- delay for 1 second for smooth refreshing
   viewsLoop ctx
@@ -69,16 +70,30 @@ inputLoop :: DR.VContext -> IO ()
 inputLoop ctx = do
   putStrLn ""
   putStr "> "
-  cmd <- getLine
-  if cmd == "" then do
-    C.forkIO $ DR.setErrorMessage "Type '?' for all available cmds" ctx; return ()
-  else do
-    let input = words $ map toLower cmd
-    case head input of
-      "d" -> do DR.updateCurrentView DR.Dashboard ctx
-      "c" -> do DR.updateCurrentView DR.CoinLookUp ctx
-      "?" -> do DR.updateCurrentView DR.Help ctx
-      "q" -> exitSuccess
+  cmd <- getChar
+  do
+    let input = toLower cmd
+    case input of
+      'd' -> do DR.updateCurrentView DR.Dashboard ctx
+      'c' -> do 
+        DR.updateCurrentView DR.CoinLookUp ctx
+        coinLookUp ctx
+      '?' -> do DR.updateCurrentView DR.Help ctx
+      'q' -> exitSuccess
     
       _   -> do C.forkIO $ DR.setErrorMessage "Type '?' for all available cmds" ctx; return ()
     inputLoop ctx
+
+coinLookUp :: DR.VContext -> IO () 
+coinLookUp ctx = do
+  IO.hSetBuffering IO.stdin IO.LineBuffering
+  IO.hSetEcho IO.stdin False
+  input <- getLine
+  case head input of
+    'q' -> do 
+      IO.hSetBuffering IO.stdin IO.NoBuffering
+      DR.updateCurrentView DR.Dashboard ctx
+    _ -> do 
+      DR.updateSearchStr input ctx
+      DR.updateCurrentView DR.CoinLookUp ctx
+      coinLookUp ctx

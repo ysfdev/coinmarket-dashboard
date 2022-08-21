@@ -16,8 +16,9 @@ type MContext = M.MVar Context
 type VContext = T.TVar ViewsContext
 
 data ViewsContext = ViewsContext {
-    topCoins :: CD.GetCoinsResult, -- 
-    currentView :: ViewName, -- Current active view
+    topCoins     :: CD.GetCoinsResult, -- latets top 10 coins
+    searchStr    :: String,
+    currentView  :: ViewName, -- Current active view
     errorMessage :: String
 } deriving(Show)
 
@@ -46,6 +47,11 @@ updateCurrentView :: ViewName -> VContext -> IO ()
 updateCurrentView name ctx = do
   vCtx <- readVCtx ctx
   writeVCtx ctx vCtx { currentView=name} 
+
+updateSearchStr :: String -> VContext -> IO ()
+updateSearchStr s ctx = do
+  vCtx <- readVCtx ctx
+  writeVCtx ctx vCtx { searchStr=s} 
 
 setErrorMessage :: String -> VContext -> IO ()
 setErrorMessage s ctx = do

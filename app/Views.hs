@@ -25,10 +25,11 @@ renderCurrentView ctx = do
   swidth <- screenWidth size
   c <- DR.readVCtx ctx
   let currentView = DR.currentView c
+      tickerName = DR.searchStr c
   mainHeader swidth currentView
   case currentView of
     DR.Dashboard  -> printDashoard swidth $ DR.topCoins c
-    DR.CoinLookUp -> coinLookUp "TEST" -- TODO: display coinLookUp
+    DR.CoinLookUp -> coinLookUp tickerName
     DR.Help       -> printHelp
 
 
@@ -70,8 +71,14 @@ printDashoard sw topCoins = do
 
 -- Show a Coin as a list of Strings
 showCoin :: CD.Coin -> [String]
-showCoin c = [strResult $ CDU._coinName c, strResult $ CDU._coinSymbol c, roundToStr 2 (fracResult $ CDU._coinQPrice c "USD"), roundToStr 2 (fracResult $ CDU._coinQPercentChange24h c "USD"), show $ CDU._coinCmcRank c]
-              where usdInfo = mapResult (CDU._coinQuoteMap c) Map.! "USD"
+showCoin c = [
+    strResult $ CDU._coinName c, 
+    strResult $ CDU._coinSymbol c, 
+    roundToStr 2 (fracResult $ CDU._coinQPrice c "USD"), 
+    roundToStr 2 (fracResult $ CDU._coinQPercentChange24h c "USD"), 
+    show (intResult $ CDU._coinCmcRank c)
+  ]
+  where usdInfo = mapResult (CDU._coinQuoteMap c) Map.! "USD"
 
 
 -- Pair strings in a list with thier corresponding lengths
@@ -97,21 +104,28 @@ showRow xs = concat $ interleave "|" xs
 -- ##################################################################################################
 
 coinLookUp :: String -> IO ()
-coinLookUp ticker =
-  if null ticker || length ticker /= 3 then do
-    putStrLn ""
-    putStrLn "Please enter the ticker ID you want to query"
-    putStrLn "Usage: C <tickerID>"
+coinLookUp ticker = do
+  if null ticker || length ticker /= 3 then do coinLookupMenu
   else do
-    coin <- getCoinNew ticker
+    coin <- getCoin ticker
     putStrLn ""
     case coin of
-      CD.ClrNotFoundError    -> putStrLn $ "Coin with ticker " ++ ticker ++ " not present in the database"
-      CD.ClrUnexpectedError  -> putStrLn "Unexpected Server Error"
-      CD.ClrCoin coin             -> do
+      CD.ClrNotFoundError    -> do
+        putStrLn $ "Coin with ticker " ++ ticker ++ " not present in the database"
+        coinLookupMenu
+      CD.ClrUnexpectedError  -> do 
+        putStrLn "Unexpected Server Error"
+        coinLookupMenu
+      CD.ClrCoin coin        -> do
         putStrLn $ showCoinInfo coin
-        putStrLn ""
-        footer
+        coinLookupMenu
+        -- footer
+
+coinLookupMenu :: IO ()
+coinLookupMenu = do 
+    putStrLn ""
+    putStrLn "Please enter the ticker ID you want to query"
+    putStrLn "Usage: <tickerID>"
 
 -- pretty print a coin 
 showCoinInfo :: Maybe CD.Coin -> String
@@ -121,7 +135,7 @@ showCoinInfo m =
     Just c ->
       "  Name:         " ++ strResult (CDU._coinName c)                             ++ "\n" ++
       "  Symbol:       " ++ strResult (CDU._coinSymbol c)                           ++ "\n" ++
-      "  Rank:         " ++ show (CDU._coinCmcRank c)                   ++ "\n" ++
+      "  Rank:         " ++ show (intResult $ CDU._coinCmcRank c)                   ++ "\n" ++
       "  Price:        " ++ show (fracResult $ CDU._coinQPrice c "USD")              ++ "\n" ++
       "  24Hr %:       " ++ show (fracResult $ CDU._coinQPercentChange24h c "USD")   ++ "\n" ++
       "  Total Supply: " ++ show (CDU._coinTotalSupply c)               ++ "\n" ++
@@ -129,8 +143,8 @@ showCoinInfo m =
       where usdInfo = mapResult (CDU._coinQuoteMap c) Map.! "USD"
 
 
-getCoinNew :: String -> IO CD.CoinLookupResult
-getCoinNew ticker = do
+getCoin :: String -> IO CD.CoinLookupResult
+getCoin ticker = do
   let t = map toUpper ticker
       params = CD.CoinLookupParams Nothing (Just t) Nothing Nothing Nothing
   CD.coinLookUp params
@@ -188,34 +202,11 @@ calcSlotsLength sw totalSlots
 strResult :: Show a => Result a -> String
 strResult r = case r of Success a -> show a; _  -> ""
 
+intResult :: Integral a => Result a -> Int
+intResult r = case r of Success a -> fromIntegral a; _  -> 0
+
 fracResult :: Fractional a => Result a -> a
 fracResult r = case r of Success a -> a; _  -> 0
 
 mapResult :: Result (Map String Object) -> Map String Object
 mapResult r = case r of Success a -> a; _  -> Map.empty
-
-
--- showCoinInfoNew :: Maybe CD.Coin -> String
--- showCoinInfoNew c =
---                "  Name:         " ++ _coinName c                             ++ "\n" ++
---                "  Symbol:       " ++ _coinSymbol c                           ++ "\n" ++
---                "  Rank:         " ++ show (_coinCmcRank c)                   ++ "\n" ++
---                "  Price:        " ++ show (_coinQPrice usdInfo)              ++ "\n" ++
---                "  24Hr %:       " ++ show (_coinQPercentChange24h usdInfo)   ++ "\n" ++
---                "  Total Supply: " ++ show (_coinTotalSupply c)               ++ "\n" ++
---                "  Market Cap:   " ++ show (_coinQMarketCap usdInfo)
---                 where usdInfo = _coinQuoteMap c Map.! "USD"
-
--- Print coin info to stdout if it exists in the database
--- printCoin :: String -> IO ()
--- printCoin ticker =
---  if null ticker || length ticker /= 3 then do
---    putStrLn ""
---    putStrLn "Please enter the ticker ID you want to query"
---    putStrLn "Usage: C <tickerID>"
---  else do
---    putStrLn ""
---    r <- getCoinNew ticker
---    putStrLn $ showCoinInfo r
---    putStrLn ""
---    putStrLn footer
