@@ -27,7 +27,6 @@ import CoinDataUtils
 import CoinDataSample
 
 import MarketDataClient
-import CoinData (CoinLookupParams(_clpCoinSymbol))
 
 data CoinProperty
   = CoinId
@@ -148,7 +147,7 @@ data CoinLookupParams = CoinLookupParams
   , _clpCoinCmcRank :: Maybe Int
   }
 
-data CoinLookupResult = ClrCoin {getCoin :: Maybe Coin} | ClrNotFoundError | ClrUnexpectedError
+data CoinLookupResult = ClrCoin {_clrGetCoin :: Maybe Coin} | ClrNotFoundError | ClrUnexpectedError
 
 data GetCoinsParams = GetCoinsParams
   {
@@ -157,7 +156,7 @@ data GetCoinsParams = GetCoinsParams
   , _tcpFilterBy :: Maybe CoinProperty
   }
 
-data GetCoinsResult = GcrCoinList {getList :: Vector Coin} | GcrNotFoundError | GcrUnexpectedError deriving Show
+data GetCoinsResult = GcrCoinList {_gcrGetList :: Vector Coin} | GcrNotFoundError | GcrUnexpectedError deriving Show
 
 
 ----- =============== End Pure Code =============== -----
