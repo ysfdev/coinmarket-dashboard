@@ -91,5 +91,5 @@ top10Coins = let
   a = case decode (toBStr _sampleCoinListData) of 
     Just o -> parseMaybe (.:: "data") o :: Maybe (Vector Coin)
     _ -> Nothing in case a of
-  Just va -> return $ GcrCoinList va
+  Just va -> return $ GcrCoinList $ V.take 10 va
   _ -> return GcrUnexpectedError
