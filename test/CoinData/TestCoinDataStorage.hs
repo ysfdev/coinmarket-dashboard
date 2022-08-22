@@ -1,112 +1,144 @@
--- import Database.Sqlite
--- import Data.Text
-
-{-# LANGUAGE QuasiQuotes #-}
-{-# LANGUAGE TypeApplications #-}
-
 module TestCoinDataStorage where
 
-import CoinDataUtils
+import Debug.Trace
 
-_createCoinDataTable = [qq|
-create table if not exists coindata
-(id integer primary key
-,name text not null
-,symbol text not null
-,slug text not null
-,cmc_rank integer not null
-,num_market_pairs integer
-,circulating_supply integer
-,total_supply integer
-,max_supply integer
-,last_updated text
-,date_added text
-,self_reported_circulating_supply integer
-,self_reported_market_cap integer);
-|]
+import CoinDataTypes
+import CoinDataStorage
+import CoinDataUtils hiding (trace)
+import CoinDataStorageUtils hiding (trace)
+import CoinDataSample
 
-_createCoinDataIndexes = [qq|
-create index idx_coinname on coindata (name);
-create index idx_coinsymbol on coindata (symbol);
-create index idx_coinslug on coindata (slug);
-create index idx_coincsupply on coindata (circulating_supply);
-create index idx_cointotalsupply on coindata (total_supply);
-create index idx_coinmaxsupply on coindata (max_supply);
-create index idx_coinlastupdated on coindata (last_updated);
-create unique index idx_coinrank on coindata (cmc_rank);
-|]
+import MarketDataClient
+import qualified MarketDataClientTypes as NT
 
-_createQuoteDataTable = [qq|
-create table if not exists quotedata
-(price double
-,volume_24h double
-,volume_change_24h double
-,percent_change_1h double
-,percent_change_24h double
-,percent_change_7d double
-,market_cap double
-,market_cap_dominance double
-,fully_diluted_market_cap double
-,last_updated text
-,id integer not null
-,unit text not null
-,primary key (id, unit)
-,foreign key (id) references coindata (id) on delete cascade on update cascade);
-|]
+import Control.Monad.IO.Class
+import Control.Monad.State.Class
+import Data.Aeson
+import Data.Aeson.Types
+import qualified Data.Aeson.Key as AK
+import Data.Text (Text)
+import qualified Data.Text as T
+import qualified Data.Text.Lazy as TL
+import qualified Data.Text.Lazy.Encoding as TLE
+import Data.Vector (Vector)
+import qualified Data.Vector as V
+import Data.Map (Map)
+import qualified Data.Map as M
+import qualified Database.SQLite3.Direct as DBD
+import qualified Database.SQLite3 as DB
+import Data.Int
 
-_createQuoteDataIndexes = [qq|
-create index idx_quotecoin on quotedata (id);
-create index idx_quoteunit on quotedata (unit);
-create index idx_quotelastupdated on quotedata (last_updated);
-create unique index idx_quotecoinprice on quotedata (id, unit, price);
-create unique index idx_quotevol24h on quotedata (id, unit, volume_change_24h);
-create unique index idx_quotevol1h on quotedata (id, unit, volume_change_1h);
-create unique index idx_quotevol7d on quotedata (id, unit, volume_change_7dh);
-create unique index idx_quotemc on quotedata (id, unit, market_cap);
-create unique index idx_quotemcdom on quotedata (id, unit, market_cap_dominance);
-create unique index idx_quotedilutedmc on quotedata (id, unit, diluted_market_cap);
-|]
+_dbLocation = "./test/CoinData/coin-test.db"
 
-_createIndexes = ""
+testInit = initializeDB _dbLocation
 
-_createTables = _createCoinDataTable <> _createQuoteDataTable
+testInitAndInsert =
+  initializeDB _dbLocation >>= \db ->
+  case toArrayFromString _sampleCoinListData of
+    Error err -> putStrLn err >> DB.close db
+    Success vc -> insertCoins db vc >> DB.close db
 
-_clearTables = [qq|
-delete from coindata;
-delete from quotedata;
-|]
+testInitAndInsert1 =
+  initializeDB _dbLocation >>= \db ->
+  case V.take 1 <$> toArrayFromString _sampleCoinListData of
+    Error err -> putStrLn err >> DB.close db
+    Success vc -> insertCoins db vc >> DB.close db
 
-_initPrologue = [qq|
-/* Database initialization Prologue */
-pragma foreign_keys = ON; /*turn on foreign key constraints*/
-|]
+testInitAndInsertMultipleQuotes =
+  initializeDB _dbLocation >>= \db ->
+  case V.fromList.(:[]) <$> (decode $ toBStr _sampleCoinData1 :: Maybe Coin)  of
+    Nothing -> putStrLn "failed to pars coin" >> DB.close db
+    Just vc -> insertCoins db vc >> DB.close db
 
-_initBody = "/* Database initialization Prologue */\n"
-  <> _createTables
+testCoinRowStrListGenerator :: IO (Result (Vector [String]))
+testCoinRowStrListGenerator = 
+  case toArrayFromString _sampleCoinListData of
+    Error err -> putStrLn err >> return (Error err)
+    Success vc -> return $ V.mapM _getCoinRowValList vc
 
-_initEpillogue = [qq|
-/*Database initialization epilogue*/
-|]
+testCoinRowValStrListGenerator :: IO (Result (Vector String))
+testCoinRowValStrListGenerator = 
+  case toArrayFromString _sampleCoinListData of
+    Error err -> putStrLn err >> return (Error err)
+    Success vc -> return $ V.mapM _getCoinRowValStr vc
 
-_initDB = _initPrologue <> _initBody <> _initEpillogue
+testProcessCoinsForInsert :: IO ()
+testProcessCoinsForInsert =
+  case toArrayFromString _sampleCoinListData of
+    Error err -> putStrLn err
+    Success vc -> 
+      putStrLn ("processing " ++ show (V.length vc) ++ " coins...") >> let
+      (cs,qs) = foldr _processCoinsForInsert ("","") vc in
+      putStr ("Coins:" <+> cs <+> "Quotes:" <+> qs)
 
-{-
-PRAGMA foreign_keys=off;
+testBuildInsertStatement = 
+  case toArrayFromString _sampleCoinListData of
+    Error err -> putStrLn err
+    Success vc -> putStr (T.unpack (_buildInsertStatemnt vc))
 
--- start a new transaction. It ensures that all subsequent statements execute successfully or nothing executes at all.
-BEGIN TRANSACTION;
+testBuildInsert1Statement = 
+  case V.take 1 <$> toArrayFromString _sampleCoinListData of
+    Error err -> putStrLn err
+    Success vc -> putStr (T.unpack (_buildInsertStatemnt vc))
 
-ALTER TABLE table RENAME TO old_table;
+testBuildInsertStatementMultipleQuotes =
+  case V.fromList.(:[]) <$> (decode $ toBStr _sampleCoinData1 :: Maybe Coin)  of
+    Nothing -> putStrLn "failed to pars coin"
+    Just vc -> putStr (T.unpack (_buildInsertStatemnt vc))
 
--- define the primary key constraint here
-CREATE TABLE table ( ... );
-j[]
-INSERT INTO table SELECT * FROM old_table;
+testFetchTopNCoins = let
+  limit = 10 
+  sortProp = CoinSymbol in 
+  initializeDB _dbLocation >>= \db ->
+  fetchTopNCoins db limit sortProp
 
--- commit all statments in the transaction
-COMMIT;
+testCoinLookup = let
+  searchProp = CoinSymbol
+  searchStr = "C%" in
+  initializeDB _dbLocation >>= \db ->
+  coinLookup db searchProp searchStr
 
-PRAGMA foreign_keys=on;
--}
+_coinTestStatement sortCol = DBD.Utf8 $ toSBStr $
+      "select "
+  <>  _coinSQLColStr
+  <>  ", "
+  <>  _coinQSqlColStr
+  <>  " from coindata inner join quotedata on coindata.id = quotedata.id where "
+  <>  sortCol
+  <>  " like :search order by cmc_rank;"
 
-dbLocation = "./coin-test.db"
+testPrepareStatement = let 
+  searchProp = CoinSlug in
+  case _getPropName searchProp of
+    Nothing -> print "Failed to find name for prop"
+    Just searchCol ->
+      initializeDB _dbLocation >>= \db ->
+      --select * from coindata inner join quotedata on coindata.id = quotedata.id where symbol = "ETH" order by cmc_rank limit 10;
+      trace "testStatement -- calling prepare" DB.prepareUtf8 db (_coinTestStatement searchCol) >>= \stmt ->
+      trace "testStatement -- calling bind" DB.bindNamed stmt
+        [
+           (toText ":search",  toSQLText "Car%")
+        ] >>
+      trace "testStatement -- calling _processResults" _processResults stmt M.empty >>= \cs ->
+      DB.finalize stmt >>
+      DB.close db >>
+      print (M.take 10 cs)
+
+testDataClientIntegration :: IO Bool
+testDataClientIntegration =let
+  numCoins = 3000
+  tdcParams = NT.QueryParams 0 numCoins in
+  fetchLatestListings tdcParams >>= \rsp -> let
+  status = NT.status rsp
+  msg = NT.message rsp
+  body = NT.body rsp
+  rCoins = V.mapM (parse parseJSON) body in
+  initializeDB _dbLocation >>= \db ->
+  case rCoins of
+    Error err -> putStrLn err >> DB.close db >> return False
+    Success coins ->
+      insertCoins db coins >>
+      DB.changes db >>= \numChanges ->
+      DB.close db >>
+      putStrLn (show numChanges <> " rows changed out of " <> show numCoins <> " requested") >>
+      return (numChanges == numCoins)
