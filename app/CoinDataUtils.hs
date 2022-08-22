@@ -8,10 +8,12 @@ import Data.Aeson
 import Data.Aeson.Types
 import qualified Data.Aeson.Key as K
 import qualified Data.ByteString.Lazy as BL
+import qualified Data.ByteString as BS
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.Encoding as TLE
+import qualified Data.Text.Encoding as TE
 import Data.Map (Map)
 import qualified Data.Map as M
 import Data.Vector (Vector)
@@ -21,6 +23,12 @@ import qualified CoinDataTypes as CoinId
 
 fromBStr :: BL.ByteString -> String
 fromBStr = TL.unpack.TLE.decodeUtf8
+
+fromSBStr :: BS.ByteString -> String
+fromSBStr = T.unpack.TE.decodeUtf8
+
+toSBStr :: String -> BS.ByteString
+toSBStr = TE.encodeUtf8.T.pack
 
 toBStr :: String -> BL.ByteString
 toBStr = TLE.encodeUtf8.TL.pack
@@ -33,6 +41,10 @@ toKey = K.fromString
 
 toParser :: FromJSON a => Object -> String -> Parser a
 toParser o s = o .: toKey s
+
+safeHead :: [a] -> Maybe a
+safeHead xs = if null xs then Nothing
+  else Just (head xs)
 
 toArrayFromString :: String -> Result (Vector Coin)
 toArrayFromString s =
@@ -171,6 +183,14 @@ data CoinFieldSchema = CoinFieldSchema
   , _cfsRequired :: CoinFieldRequired
   }
 
+_getPropName :: CoinProperty -> Maybe String
+_getPropName prop =
+  case M.lookup prop _coinPropMap of
+    Just schema -> Just $ _cfsFieldName schema
+    Nothing -> case M.lookup prop _coinQPropMap of
+      Nothing -> Nothing
+      Just schema -> Just $ _cfsFieldName schema
+
 -- coin schema declarations - could be moved to a json config file
 
 _coinPropMap :: CoinPropMap
@@ -206,6 +226,8 @@ _coinQPropMap = M.fromList
   , (CoinQFullyDilutedMarketCap,        CoinFieldSchema   "fully_diluted_market_cap"          CstReal    CfRequired)
   , (CoinQLastUpdated,                  CoinFieldSchema   "last_updated"                      CstString  CfRequired)
   ]
+
+_coinQuoteSchema = CoinFieldSchema "quote" CstObject CfRequired
 
 qq = QuasiQuoter { 
     quoteExp = stringE -- only interested in expressions currently

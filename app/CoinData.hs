@@ -42,26 +42,6 @@ import MarketDataClient
 -- coinFromJSON :: String -> Maybe Coin
 -- coinFromJSON s = decode $ toBStr s
 
-data CoinLookupParams = CoinLookupParams 
-  {
-    _clpCoinName :: Maybe String  -- (text search based on name)
-  , _clpCoinSymbol :: Maybe String -- (text search based on ticker)
-  , _clpCoinSlug :: Maybe String -- (text search based on slug)
-  , _clpCoinId :: Maybe Int
-  , _clpCoinCmcRank :: Maybe Int
-  }
-
-data CoinLookupResult = ClrCoin {_clrGetCoin :: Maybe Coin} | ClrNotFoundError | ClrUnexpectedError
-
-data GetCoinsParams = GetCoinsParams
-  {
-    _tcpLimit :: Maybe Int
-  , _tcpSortBy :: Maybe CoinProperty
-  , _tcpFilterBy :: Maybe CoinProperty
-  }
-
-data GetCoinsResult = GcrCoinList {_gcrGetList :: Vector Coin} | GcrNotFoundError | GcrUnexpectedError deriving Show
-
 
 ----- =============== End Pure Code =============== -----
 
