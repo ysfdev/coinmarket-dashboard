@@ -41,6 +41,7 @@ executable coinmarket-dashboard
         CoinDataSample
         CoinDataStorageUtils
         DataRefresher
+        DataRefresherTypes
         Views
         TestCoinData
         TestCoinDataStorage

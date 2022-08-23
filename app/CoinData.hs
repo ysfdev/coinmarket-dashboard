@@ -4,15 +4,13 @@
 module CoinData 
 (
   Coin (..)
--- , coinFromJSON
--- , coinListFromArray
--- , CoinQuote (..)
--- , coinQuoteFromJSON
 , CoinProperty (..)
 , CoinLookupParams (..)
 , CoinLookupResult (..)
+, CoinTextSearchStyle (..)
+, CoinLookupSearchData (..)
 , GetCoinsResult (..)
-, coinLookUp
+, coinLookup
 , top10Coins
 ) where
 
@@ -23,62 +21,44 @@ import Data.Maybe
 import Data.Aeson
 import Data.Aeson.Types
 
+import qualified Control.Concurrent.MVar as M
+
+import Database.SQLite3(Database)
+
 import CoinDataUtils
 import CoinDataTypes
 import CoinDataSample
-import MarketDataClient
-
--- coinQuoteFromJSON :: String -> Maybe CoinQuote
--- coinQuoteFromJSON s = decode $ toBStr s
-
--- coinListFromArray :: Array -> Vector (Maybe Coin)
--- coinListFromArray = V.map (parseMaybe parseJSON)
-
--- coinListFromJSON :: String -> Maybe (Vector Coin)
--- coinListFromJSON s = case decode (toBStr s) of
---   Nothing -> Nothing
---   (Just q) -> coinListFromArray q
-
--- coinFromJSON :: String -> Maybe Coin
--- coinFromJSON s = decode $ toBStr s
-
+import qualified CoinDataStorage as CDS
+import qualified DataRefresherTypes as DR
 
 ----- =============== End Pure Code =============== -----
 
-
 -- Should perform full text search look up on local coin data store based on _coinSlug (coin name)
-coinLookUp :: CoinLookupParams -> IO CoinLookupResult
--- coinLookUp _ = return ClrNotFoundError
-coinLookUp _ = let  
-  a = case decode (toBStr _sampleCoinListData) of 
-    Just o -> parseMaybe (.:: "data") o :: Maybe (Vector Coin)
-    _ -> Nothing in 
-  case a of
-    Just va ->
-      if not $ null va then return $ ClrCoin $ Just $ V.head va
-      else return ClrNotFoundError
-    _ -> return ClrNotFoundError
+coinLookup :: DR.SContext -> CoinLookupParams -> IO CoinLookupResult
+coinLookup sCtx (CoinLookupParams sd ss ) = let
+  (srchProp,sBaseStr) = case sd of
+    ClsdName s -> (CoinName,s)
+    ClsdSymbol s -> (CoinSymbol,s)
+    ClsdSlug s -> (CoinSlug,s)
+  srchStr = case ss of
+    CtssBegin -> sBaseStr <> "%"
+    CtssEnd -> "%" <> sBaseStr
+    CtssContain -> "%" <> sBaseStr <> "%" in 
+  M.takeMVar sCtx >>= \sc -> let -- start blocking db access
+  db = DR.storageHandle sc in
+  CDS.coinLookup db srchProp srchStr >>= \rslt ->
+  M.putMVar sCtx sc >> -- end blocking db access
+  return rslt
 
 -- Fetch from DB
-getCoins :: GetCoinsParams -> IO GetCoinsResult
-getCoins _ = return GcrNotFoundError
+getCoins :: DR.SContext -> GetCoinsParams -> IO GetCoinsResult
+getCoins sCtx (GetCoinsParams limit sortProp _ unit) =
+  M.takeMVar sCtx >>= \sc -> let -- start blocking db access
+  db = DR.storageHandle sc in
+  CDS.fetchTopNCoins db unit limit sortProp >>= \rslt ->
+  M.putMVar sCtx sc >> -- end blocking db access
+  return rslt
 
 -- Fetch the top ten coins from the local store
-top10Coins :: IO GetCoinsResult
--- top10Coins = getCoins $ GetCoinsParams (Just 10) Nothing Nothing
--- top10Coins = let 
---   a = case decode (toBStr _sampleCoinListData) of 
---     Just o -> parseMaybe (.: toKey "data") o :: Maybe Array
---     _ -> Nothing in case a of
---   Just a -> case V.mapM (parseMaybe (parseJSON @Coin)) a of
---     Just va -> return $ GcrCoinList (V.take 10 va)
---     Nothing -> return $ GcrCoinList V.empty
---   _ -> return $ GcrCoinList V.empty
-
-top10Coins = let 
-  a = case decode (toBStr _sampleCoinListData) of 
-    Just o -> parseMaybe (.:: "data") o :: Maybe (Vector Coin)
-    _ -> Nothing in
-  case a of
-    Just va -> return $ GcrCoinList $ V.take 10 va
-    _ -> return GcrUnexpectedError
+top10Coins :: DR.SContext -> IO GetCoinsResult
+top10Coins sCtx = getCoins sCtx (GetCoinsParams {_gcpLimit=10, _gcpSortBy=CoinCmcRank, _gcpFilterBy=CoinId, _gcpUnit="USD"})

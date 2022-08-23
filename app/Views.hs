@@ -29,7 +29,7 @@ renderCurrentView ctx = do
   mainHeader swidth currentView
   case currentView of
     DR.Dashboard  -> printDashoard swidth $ DR.topCoins c
-    DR.CoinLookUp -> coinLookUp tickerName
+    DR.CoinLookUp -> coinLookUp ctx
     DR.Help       -> printHelp
 
 
@@ -103,11 +103,15 @@ showRow xs = concat $ interleave "|" xs
 -- ######################################## Coin View ###############################################
 -- ##################################################################################################
 
-coinLookUp :: String -> IO ()
-coinLookUp ticker = do
+coinLookUp :: DR.VContext -> IO ()
+coinLookUp vCtx = do
+  viewData <- DR.readVCtx vCtx
+  let 
+    ticker = DR.searchStr viewData
+    sCtx = DR.sContext viewData
   if null ticker || length ticker /= 3 then do coinLookupMenu
   else do
-    coin <- getCoin ticker
+    coin <- getCoin sCtx ticker
     putStrLn ""
     case coin of
       CD.ClrNotFoundError    -> do
@@ -128,11 +132,8 @@ coinLookupMenu = do
     putStrLn "Usage: <tickerID>"
 
 -- pretty print a coin 
-showCoinInfo :: Maybe CD.Coin -> String
-showCoinInfo m =
-  case m of
-    Nothing -> "Coin not found"
-    Just c ->
+showCoinInfo :: CD.Coin -> String
+showCoinInfo c =
       "  Name:         " ++ strResult (CDU._coinName c)                             ++ "\n" ++
       "  Symbol:       " ++ strResult (CDU._coinSymbol c)                           ++ "\n" ++
       "  Rank:         " ++ show (intResult $ CDU._coinCmcRank c)                   ++ "\n" ++
@@ -143,11 +144,11 @@ showCoinInfo m =
       where usdInfo = mapResult (CDU._coinQuoteMap c) Map.! "USD"
 
 
-getCoin :: String -> IO CD.CoinLookupResult
-getCoin ticker = do
+getCoin :: DR.SContext -> String -> IO CD.CoinLookupResult
+getCoin sCtx ticker = do
   let t = map toUpper ticker
-      params = CD.CoinLookupParams Nothing (Just t) Nothing Nothing Nothing
-  CD.coinLookUp params
+      params = CD.CoinLookupParams (CD.ClsdSymbol t) CD.CtssBegin
+  CD.coinLookup sCtx params
 
 
 -- ##################################################################################################
