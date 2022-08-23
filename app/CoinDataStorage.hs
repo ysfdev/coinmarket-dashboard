@@ -1,5 +1,8 @@
 module CoinDataStorage where
 
+-- Control Imports --
+import Control.Exception
+
 -- CoinData imports -- 
 import CoinDataTypes
 import CoinDataUtils
@@ -13,7 +16,11 @@ import qualified Database.SQLite3.Direct as DBD
 import qualified Data.Vector as V
 import qualified Data.Map as M
 
+-- displayException :: SQLError -> String
+errorHandler ex =
+  putStrLn $ "Caught exception: " ++ show ex
 
+-- catch (print $ 5 `div` 0) handler
 initializeDB :: String -> IO DB.Database
 initializeDB dbLoc = DB.open (toText dbLoc) >>= \db ->
   DB.exec db _initDB >>
@@ -34,7 +41,6 @@ fetchTopNCoins db qUnit limit sortProp =
         ] >>
       _processResults stmt M.empty >>= \cs ->
       DB.finalize stmt >>
-      DB.close db >>
       return (GcrCoinList $ V.fromList $ take limit (M.elems cs))
 
 -- For partial matches searchStr should have % prepended, appended,
@@ -58,6 +64,5 @@ coinLookup db searchProp searchStr =
         ] >>
       _processResults stmt M.empty >>= \cs ->
       DB.finalize stmt >>
-      DB.close db >>
       if null cs then return ClrNotFoundError
       else return (ClrCoin (head $ M.elems cs))
