@@ -267,7 +267,7 @@ _getRowObject kvs (sqldata,schema) = let
       _-> _nullOnOptional kvs propReq propKey
     DB.SQLNull -> kvs <> [propKey.=Null]
 
-_getNextCol :: DB.Statement -> Map Int64 Coin -> IO (Map Int64 Coin)
+_getNextCol :: DB.Statement -> Map Int Coin -> IO (Map Int Coin)
 _getNextCol stmt cs0 = let
   colTypes = _coinSQLColTypes <> _coinQSQLColTypes 
   schemaList = _coinSQLSchema <> _coinQSQLSchema in
@@ -278,41 +278,43 @@ _getNextCol stmt cs0 = let
       zip cCols _coinSQLSchema
     , zip qCols _coinQSQLSchema
     )
-  mcid = fromSQLInteger (head cCols)
-  in
-  case mcid of
-    Nothing -> trace ("no coin id - skip it") return cs0 -- no coin id - skip it
-    Just cid -> let
-      cs1 = case M.lookup cid cs0 of
-        Nothing -> let 
-          x = foldl _getRowObject [] cColInfo 
-          y = x <> [_coinQuoteKey .= object []]
-          z = parse parseJSON (object y) :: Result Coin in
-          case z of 
-            Error err -> trace ("skip this coin -- " <> err) cs0 -- skip this coin 
-            Success coin -> M.insert cid coin cs0
-        Just v -> cs0
-      cs2 = 
-        if null cs1 then M.empty
-        else let 
-          x = foldl _getRowObject [] qColInfo 
-          y = parse parseJSON (object x) :: Result Object 
-          z = M.lookup cid cs1
-          in case (y,z) of
-            (Success q1,Just c0) ->
-              case __coinPropVal q1 _coinQUnitStr :: Result String of
-                Error err -> trace ("failed to get unit for quote -- " <> err) cs1 -- skip this coin
-                Success unit -> let
-                  qm0 = _quoteJSON c0
-                  qm1 =
-                    if null qm0 then M.fromList [(unit,q1)]
-                    else M.insert unit q1 qm0
-                  c1 = c0 {_quoteJSON = qm1}
-                  in M.insert cid c1 cs1
-            _ -> trace ("skip the quote - we must've skipped the coin above") cs1 -- skip the quote - we must've skipped the coin above
-      in return cs2
+  (mrank,cs1) = let 
+      x = foldl _getRowObject [] cColInfo 
+      y = x <> [_coinQuoteKey .= object []]
+      z = parse parseJSON (object y) :: Result Coin in
+      case z of 
+        Error err -> trace ("skip this coin -- " <> err) (Nothing,cs0) -- skip this coin 
+        Success coin -> case (_coinId coin, _coinCmcRank coin) of
+          (Error err1, Error err2) -> trace ("skip this coind -- " <> err1 <> "\n" <> err2) (Nothing,cs0)
+          (Error err1, _) -> trace ("skip this coind -- " <> err1) (Nothing,cs0)
+          (_, Error err2) -> trace ("skip this coind -- " <> err2) (Nothing,cs0)
+          (Success cid, Success rank) -> 
+            case M.lookup rank cs0 of
+              Nothing -> (Just rank, M.insert rank coin cs0)
+              Just v -> (Nothing,cs0)
+  cs2 = 
+    if null cs1 then M.empty
+    else case (mrank) of 
+      Just rank -> let
+        x = foldl _getRowObject [] qColInfo 
+        y = parse parseJSON (object x) :: Result Object 
+        z = M.lookup rank cs1
+        in case (y,z) of
+          (Success q1,Just c0) ->
+            case __coinPropVal q1 _coinQUnitStr :: Result String of
+              Error err -> trace ("failed to get unit for quote -- " <> err) cs1 -- skip this coin
+              Success unit -> let
+                qm0 = _quoteJSON c0
+                qm1 =
+                  if null qm0 then M.fromList [(unit,q1)]
+                  else M.insert unit q1 qm0
+                c1 = c0 {_quoteJSON = qm1}
+                in M.insert rank c1 cs1
+          _ -> trace ("skip the quote - we must've skipped the coin above") cs1 -- skip the quote - we must've skipped the coin above
+      _ -> cs1
+  in return cs2
       
-_processResults :: DB.Statement -> Map Int64 Coin -> IO (Map Int64 Coin)
+_processResults :: DB.Statement -> Map Int Coin -> IO (Map Int Coin)
 _processResults stmt cs0 =
   DB.step stmt >>= \rslt -> 
   if rslt == DB.Row then
