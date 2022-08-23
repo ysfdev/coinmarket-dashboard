@@ -39,23 +39,35 @@ data Coin = Coin
   , _quoteJSON :: Map String Object
   } deriving (Show)
 
+data CoinTextSearchStyle = 
+    CtssBegin     -- Begins with search term
+  | CtssEnd       -- Ends with search term
+  | CtssContain   -- Contains search term
+
+data CoinLookupSearchData = 
+  -- (text search based on name)
+    ClsdName   { _clsdCoinName :: String }
+  -- (text search based on ticker symbol) 
+  | ClsdSymbol { _clsdCoinSymbol :: String }
+   -- (text search based on slug)
+  | ClsdSlug   { _clsdCoinSlug :: String }
+  deriving (Show)
+
 data CoinLookupParams = CoinLookupParams 
   {
-    _clpCoinName :: Maybe String  -- (text search based on name)
-  , _clpCoinSymbol :: Maybe String -- (text search based on ticker)
-  , _clpCoinSlug :: Maybe String -- (text search based on slug)
-  , _clpCoinId :: Maybe Int
-  , _clpCoinCmcRank :: Maybe Int
-  } deriving (Show)
+    clpSearchData :: CoinLookupSearchData
+  , clpSearchStyle :: CoinTextSearchStyle
+  }
 
-data CoinLookupResult = ClrCoin {_clrGetCoin :: Maybe Coin} | ClrNotFoundError | ClrUnexpectedError
+data CoinLookupResult = ClrCoin {_clrGetCoin :: Coin} | ClrNotFoundError | ClrUnexpectedError
   deriving (Show)
 
 data GetCoinsParams = GetCoinsParams
   {
-    _tcpLimit :: Maybe Int
-  , _tcpSortBy :: Maybe CoinProperty
-  , _tcpFilterBy :: Maybe CoinProperty
+    _gcpLimit :: Int
+  , _gcpSortBy :: CoinProperty
+  , _gcpFilterBy :: CoinProperty
+  , _gcpUnit :: String
   }
   deriving (Show)
 

@@ -1,47 +1,53 @@
-module DataRefresher where
+module DataRefresher
+(
+  MContext
+, VContext
+, SContext
+, ViewsContext (..)
+, StorageContext (..)
+, Context (..)
+, ViewName (..)
+, RefreshInterval
+, readVCtx
+, writeVCtx
+, refresh
+, updateCurrentView
+, updateSearchStr
+, setErrorMessage
+, clearErrorMessage
+) where
+
 import qualified Control.Concurrent as C
 import qualified Control.Concurrent.MVar as M
 import qualified Control.Concurrent.STM.TVar as T
 import qualified Control.Concurrent.STM as STM
 import qualified Control.Concurrent.Async as Async
+import qualified Control.Monad as CM
 
+import Database.SQLite3 (Database)
+
+import DataRefresherTypes
 import qualified CoinData as CD
 import qualified CoinDataStorage as CDS
 import CoinData (GetCoinsResult)
-
-data ViewName = Dashboard | CoinLookUp | Help deriving (Show, Eq)
-type RefreshInterval = Int
-
-type MContext = M.MVar Context
-type VContext = T.TVar ViewsContext
-
-data ViewsContext = ViewsContext {
-    topCoins     :: CD.GetCoinsResult, -- latets top 10 coins
-    searchStr    :: String,
-    currentView  :: ViewName, -- Current active view
-    errorMessage :: String
-} deriving(Show)
-
-data Context = Context { 
-    vContext :: VContext,
-    store :: String -- TODO: update with actual SqlLite client type
-} 
-
-refresh :: MContext -> RefreshInterval -> IO ()
-refresh ctx interval = do
-  C.threadDelay interval
-  c <- C.takeMVar ctx
-  updatedTopCoins <- CD.top10Coins -- TODO pass store ctx
-  let v = vContext c
-  vCtx <- readVCtx v
-  writeVCtx v vCtx { topCoins = updatedTopCoins }
-  M.putMVar ctx c
+import qualified Control.Monad.Cont as CM
 
 readVCtx :: VContext -> IO ViewsContext
 readVCtx ctx = STM.atomically $ T.readTVar ctx
 
 writeVCtx :: VContext -> ViewsContext -> IO ()
 writeVCtx v ctx = STM.atomically $ T.writeTVar v ctx
+
+refresh :: MContext -> RefreshInterval -> IO ()
+refresh ctx interval = do
+  C.threadDelay interval
+  c <- C.takeMVar ctx
+  let v = vContext c
+  vCtx <- readVCtx v
+  let sCtx = sContext vCtx
+  updatedTopCoins <- CD.top10Coins sCtx
+  writeVCtx v vCtx { topCoins = updatedTopCoins }
+  M.putMVar ctx c
 
 updateCurrentView :: ViewName -> VContext -> IO () 
 updateCurrentView name ctx = do

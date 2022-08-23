@@ -13,28 +13,33 @@ import System.Exit (exitSuccess)
 import qualified GHC.Profiling as C
 
 import qualified CoinData as CD
+import qualified CoinDataStorage as CDS
 import qualified DataRefresher as DR
 import qualified Views
 import DataRefresher (RefreshInterval)
 import GHC.IO.Handle (hFlush)
+
+import Database.SQLite3 (Database)
+
+_dbLoc = "./coin.db"
 
 main :: IO ()
 main = do
   IO.hSetBuffering IO.stdout IO.NoBuffering 
   IO.hSetBuffering IO.stdin IO.NoBuffering 
   putStrLn "Welcome, CoinMarket Dashboard"
-    -- storage <- CDS.init 
-    -- topCoins <- CD.top10Coins ctx.store
-  topCoins <- CD.top10Coins  -- TODO pass storeClient
+  db <- CDS.initializeDB _dbLoc
+  sCtx <- C.newMVar DR.StorageContext { DR.storageHandle = db }
+  topCoins <- CD.top10Coins sCtx
   vCtx <- STM.atomically $ T.newTVar DR.ViewsContext {
     DR.topCoins=topCoins,
     DR.currentView=DR.Dashboard,
     DR.errorMessage="",
-    DR.searchStr=""
+    DR.searchStr="",
+    DR.sContext = sCtx
   }
   mCtx <- C.newMVar DR.Context {
-    DR.vContext=vCtx,
-    DR.store="" -- TODO pass storage client
+    DR.vContext=vCtx
   }
 
   let refreshIntervalSecs = 30 -- interval (in seconds) to refresh data

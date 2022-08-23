@@ -22,15 +22,15 @@ initializeDB dbLoc = DB.open (toText dbLoc) >>= \db ->
 insertCoins :: Foldable t => DB.Database -> t Coin -> IO ()
 insertCoins db vc = DB.exec db $ _buildInsertStatemnt vc
 
-fetchTopNCoins :: DB.Database -> Int -> CoinProperty -> IO GetCoinsResult
-fetchTopNCoins db limit sortProp =
+fetchTopNCoins :: DB.Database -> String -> Int -> CoinProperty -> IO GetCoinsResult
+fetchTopNCoins db qUnit limit sortProp =
   case _getPropName sortProp of
     Nothing -> return GcrUnexpectedError
     Just sortCol ->
       DB.prepareUtf8 db (_coinTopNStatement sortCol) >>= \stmt ->
       DB.bindNamed stmt
         [
-          (toText ":unit",    toSQLText "USD")
+          (toText ":unit",    toSQLText qUnit)
         ] >>
       _processResults stmt M.empty >>= \cs ->
       DB.finalize stmt >>
@@ -60,4 +60,4 @@ coinLookup db searchProp searchStr =
       DB.finalize stmt >>
       DB.close db >>
       if null cs then return ClrNotFoundError
-      else return (ClrCoin (safeHead $ M.elems cs))
+      else return (ClrCoin (head $ M.elems cs))

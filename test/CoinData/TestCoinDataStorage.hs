@@ -87,14 +87,15 @@ testBuildInsertStatementMultipleQuotes =
     Just vc -> putStr (T.unpack (_buildInsertStatemnt vc))
 
 testFetchTopNCoins = let
+  qUnit = "USD"
   limit = 10 
   sortProp = CoinSymbol in 
   initializeDB _dbLocation >>= \db ->
-  fetchTopNCoins db limit sortProp
+  fetchTopNCoins db qUnit limit sortProp
 
 testCoinLookup = let
   searchProp = CoinSymbol
-  searchStr = "C%" in
+  searchStr = "l%" in
   initializeDB _dbLocation >>= \db ->
   coinLookup db searchProp searchStr
 
