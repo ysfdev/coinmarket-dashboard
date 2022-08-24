@@ -18,6 +18,8 @@ module DataRefresher
 , resetSearchParams
 , refreshDataStore
 , elapsedTime
+, incViewChangeCount
+, clearViewCHangeCount
 ) where
 
 import qualified Control.Concurrent as C
@@ -58,6 +60,7 @@ refresh ctx interval = do
   refreshDataStore sCtx
   updatedTopCoins <- CD.topNCoins sCtx $ maxDashboardCoins vCtx
   writeVCtx v vCtx { topCoins = updatedTopCoins }
+  incViewChangeCount v
   M.putMVar ctx c
 
 elapsedTime :: TM.UTCTime -> IO TM.NominalDiffTime
@@ -114,21 +117,26 @@ updateCurrentView :: ViewName -> VContext -> IO ()
 updateCurrentView name ctx = do
   vCtx <- readVCtx ctx
   writeVCtx ctx vCtx { currentView=name}
+  incViewChangeCount ctx
+
 
 updateSearchStr :: VContext -> String  -> IO ()
 updateSearchStr ctx sStr = do
   vCtx <- readVCtx ctx
   writeVCtx ctx vCtx { searchStr=sStr }
+  incViewChangeCount ctx
 
 resetSearchParams :: VContext -> IO ()
 resetSearchParams ctx = do
   vCtx <- readVCtx ctx
   writeVCtx ctx vCtx { searchStr=""}
+  incViewChangeCount ctx
 
 setErrorMessage :: String -> VContext -> IO ()
 setErrorMessage s ctx = do
   vCtx <- readVCtx ctx
   writeVCtx ctx vCtx { errorMessage=s}
+  incViewChangeCount ctx
   C.forkIO (clearErrorMessage ctx)
   return ()
 
@@ -137,3 +145,15 @@ clearErrorMessage ctx = do
   C.threadDelay $ round (3*10e6)
   vCtx <- readVCtx ctx
   writeVCtx ctx vCtx {errorMessage = ""}
+  incViewChangeCount ctx
+
+
+incViewChangeCount :: VContext -> IO ()
+incViewChangeCount ctx = do
+  vCtx <- readVCtx ctx
+  writeVCtx ctx vCtx { changeCount = changeCount vCtx + 1 }
+
+clearViewCHangeCount :: VContext -> IO ()
+clearViewCHangeCount ctx = do
+  vCtx <- readVCtx ctx
+  writeVCtx ctx vCtx { changeCount = 0 }

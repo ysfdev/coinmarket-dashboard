@@ -30,13 +30,18 @@ renderCurrentView ctx = do
   size <- TSize.size
   swidth <- screenWidth size
   c <- DR.readVCtx ctx
-  let currentView = DR.currentView c
-      tickerName = DR.searchStr c
-  mainHeader swidth currentView 
-  case currentView of
-    DR.Dashboard  -> printDashoard ctx swidth $ DR.topCoins c
-    DR.CoinLookUp -> coinLookUp ctx
-    DR.Help       -> printHelp
+  if DR.changeCount c <= 0 then return ()
+  else do
+    ANSI.clearFromCursorToScreenBeginning
+    ANSI.setCursorPosition 0 0
+    let currentView = DR.currentView c
+        tickerName = DR.searchStr c
+    mainHeader swidth currentView 
+    case currentView of
+      DR.Dashboard  -> printDashoard ctx swidth $ DR.topCoins c
+      DR.CoinLookUp -> coinLookUp ctx
+      DR.Help       -> printHelp
+    DR.clearViewCHangeCount ctx -- done rendering so clear the change count
 
 displayCtxErrorMsg :: DR.VContext -> IO ()
 displayCtxErrorMsg ctx = do

@@ -26,6 +26,7 @@ data ViewsContext = ViewsContext {
     searchStr        :: String,
     currentView      :: ViewName, -- Current active view
     errorMessage     :: String,
+    changeCount      :: Int,
     sContext         :: SContext
 }
 
