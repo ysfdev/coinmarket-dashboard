@@ -13,24 +13,28 @@ import qualified Database.SQLite3 as DB
 import qualified Database.SQLite3.Direct as DBD
 
 -- Data imports --
+import Data.Vector (Vector)
 import qualified Data.Vector as V
 import qualified Data.Map as M
 
--- displayException :: SQLError -> String
-errorHandler ex =
-  putStrLn $ "Caught exception: " ++ show ex
 
--- catch (print $ 5 `div` 0) handler
 initializeDB :: String -> IO DB.Database
 initializeDB dbLoc = DB.open (toText dbLoc) >>= \db ->
   DB.exec db _initDB >>
   return db
 
-insertCoins :: Foldable t => DB.Database -> t Coin -> IO ()
+insertCoins :: DB.Database -> Vector Coin -> IO ()
 insertCoins db vc = DB.exec db $ _buildInsertStatemnt vc
 
 fetchTopNCoins :: DB.Database -> String -> Int -> CoinProperty -> IO GetCoinsResult
-fetchTopNCoins db qUnit limit sortProp =
+fetchTopNCoins db qUnit limit sortProp = catch (_exFetchTopNCoins db qUnit limit sortProp) handleIt where
+      handleIt e = 
+        case fromException e of
+          Just (DB.SQLError code details context) -> return GcrUnexpectedError
+          _-> throwIO e
+
+_exFetchTopNCoins :: DB.Database -> String -> Int -> CoinProperty -> IO GetCoinsResult
+_exFetchTopNCoins db qUnit limit sortProp =
   case _getPropName sortProp of
     Nothing -> return GcrUnexpectedError
     Just sortCol ->
@@ -53,7 +57,14 @@ fetchTopNCoins db qUnit limit sortProp =
 -- searchStr: "%BT%"
 --  
 coinLookup :: DB.Database -> CoinProperty -> String -> IO CoinLookupResult
-coinLookup db searchProp searchStr =
+coinLookup db searchProp searchStr = catch (_exCoinLookup db searchProp searchStr) handleIt where
+      handleIt e = 
+        case fromException e of
+          Just (DB.SQLError code details context) -> return ClrUnexpectedError
+          _-> throwIO e
+
+_exCoinLookup :: DB.Database -> CoinProperty -> String -> IO CoinLookupResult
+_exCoinLookup db searchProp searchStr =
   case _getPropName searchProp of
     Nothing -> return ClrUnexpectedError
     Just searchCol ->
