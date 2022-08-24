@@ -2,7 +2,9 @@
 
 Haskell CLI crypto coins market prices dashboard. 
 
-**Note: this only inital beta(subject to change)**
+**Note: inital beta POC (subject to breaking changes)**
+**Only use for educational purposes**
+
 ## Main Features 
 
 Live market data refreshed every `60` seconds from CoinMarketCap.
