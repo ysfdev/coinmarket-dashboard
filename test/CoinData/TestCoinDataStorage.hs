@@ -86,6 +86,12 @@ testBuildInsertStatementMultipleQuotes =
     Nothing -> putStrLn "failed to pars coin"
     Just vc -> putStr (T.unpack (_buildInsertStatemnt vc))
 
+testBuildInsertStatmentValList :: IO ()
+testBuildInsertStatmentValList = 
+  case toArrayFromString _sampleCoinListData of
+    Error err -> putStrLn err
+    Success vc -> mapM_ (\v -> putStr (show v <> "\n\n\n")) (_buildInsertStatmentValList vc)
+
 testFetchTopNCoins = let
   qUnit = "USD"
   limit = 10 
@@ -98,6 +104,18 @@ testCoinLookup = let
   searchStr = "l%" in
   initializeDB _dbLocation >>= \db ->
   coinLookup db searchProp searchStr
+
+testInsertCoins = 
+  case toArrayFromString _sampleCoinListData of
+    Error err -> putStrLn err >> return False
+    Success vc -> let
+      numCoins = V.length vc in
+      initializeDB _dbLocation >>= \db ->
+      insertCoins' db vc >>
+      DB.changes db >>= \numChanges ->
+      DB.close db >>
+      putStrLn (show numChanges <> " rows changed out of " <> show numCoins <> " requested") >>
+      return (numChanges == numCoins)
 
 _coinTestStatement sortCol = DBD.Utf8 $ toSBStr $
       "select "

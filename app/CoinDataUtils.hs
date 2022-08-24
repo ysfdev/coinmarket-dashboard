@@ -207,9 +207,10 @@ _coinPropMap = M.fromList
   , (CoinMaxSupply,                     CoinFieldSchema   "max_supply"                        CstReal     CfRequired)
   , (CoinLastUpdated,                   CoinFieldSchema   "last_updated"                      CstString   CfRequired)
   , (CoinDateAdded,                     CoinFieldSchema   "date_added"                        CstString   CfRequired)
-  -- , (CoinTags,                          CoinFieldSchema   "tags"                              CstArray    CfRequired)
+  , (CoinTags,                          CoinFieldSchema   "tags"                              CstArray    CfRequired)
   , (CoinSelfReportedCirculatingSupply, CoinFieldSchema   "self_reported_circulating_supply"  CstReal     CfOptional)
   , (CoinSelfReportedMarketCap,         CoinFieldSchema   "self_reported_market_cap"          CstReal     CfOptional)
+  , (CoinQuote,                         CoinFieldSchema   "quote"                             CstObject   CfRequired)
   ]
 
 _coinQPropMap :: CoinPropMap

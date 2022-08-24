@@ -26,6 +26,13 @@ initializeDB dbLoc = DB.open (toText dbLoc) >>= \db ->
 insertCoins :: DB.Database -> Vector Coin -> IO ()
 insertCoins db vc = DB.exec db $ _buildInsertStatemnt vc
 
+insertCoins' :: DB.Database -> Vector Coin -> IO ()
+insertCoins' db vc = let numCoins = V.length vc in
+  DB.prepareUtf8 db (_coinInsertStatement numCoins) >>= \stmt ->
+  DB.bindNamed stmt (_buildInsertStatmentValList vc) >>
+  _processInsertResults stmt >>
+  DB.finalize stmt
+
 fetchTopNCoins :: DB.Database -> String -> Int -> CoinProperty -> IO GetCoinsResult
 fetchTopNCoins db qUnit limit sortProp = catch (_exFetchTopNCoins db qUnit limit sortProp) handleIt where
       handleIt e = 
