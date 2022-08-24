@@ -13,6 +13,7 @@ import qualified Database.SQLite3 as DB
 import qualified Database.SQLite3.Direct as DBD
 
 -- Data imports --
+import Data.Vector (Vector)
 import qualified Data.Vector as V
 import qualified Data.Map as M
 
@@ -28,6 +29,13 @@ initializeDB dbLoc = DB.open (toText dbLoc) >>= \db ->
 
 insertCoins :: Foldable t => DB.Database -> t Coin -> IO ()
 insertCoins db vc = DB.exec db $ _buildInsertStatemnt vc
+
+insertCoins' :: DB.Database -> Vector Coin -> IO ()
+insertCoins' db vc = let numCoins = V.length vc in
+  DB.prepareUtf8 db (_coinInsertStatement numCoins) >>= \stmt ->
+  DB.bindNamed stmt (_buildInsertStatmentValList vc) >>
+  _processInsertResults stmt >>
+  DB.finalize stmt
 
 fetchTopNCoins :: DB.Database -> String -> Int -> CoinProperty -> IO GetCoinsResult
 fetchTopNCoins db qUnit limit sortProp =

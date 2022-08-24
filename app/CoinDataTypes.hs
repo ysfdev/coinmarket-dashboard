@@ -21,6 +21,7 @@ data CoinProperty
   | CoinTags
   | CoinSelfReportedCirculatingSupply
   | CoinSelfReportedMarketCap
+  | CoinQuote
   | CoinQPrice
   | CoinQVolume24H
   | CoinQVolumeChange24h
