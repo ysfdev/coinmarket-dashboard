@@ -18,6 +18,7 @@ import qualified DataRefresher as DR
 import qualified Views
 import DataRefresher (RefreshInterval)
 import GHC.IO.Handle (hFlush)
+import qualified Data.Time as TM
 
 import Database.SQLite3 (Database)
 
@@ -27,12 +28,20 @@ main :: IO ()
 main = do
   IO.hSetBuffering IO.stdout IO.NoBuffering
   IO.hSetBuffering IO.stdin IO.NoBuffering
+  ANSI.setTitle "CoinMarketDashboard"
   putStrLn "Welcome, CoinMarket Dashboard"
   db <- CDS.initializeDB _dbLoc
-  sCtx <- C.newMVar DR.StorageContext { DR.storageHandle = db }
-  topCoins <- CD.top10Coins sCtx
+  storeRefreshedAt <- TM.getCurrentTime
+  sCtx <- C.newMVar DR.StorageContext { 
+    DR.storageHandle=db, 
+    DR.lastRefreshedAt=storeRefreshedAt,
+    DR.refreshIntervalSecs=60 --seconds 
+  }
+  let maxDashboardCoins = 12
+  topCoins <- CD.topNCoins sCtx maxDashboardCoins
   vCtx <- STM.atomically $ T.newTVar DR.ViewsContext {
     DR.topCoins=topCoins,
+    DR.maxDashboardCoins=maxDashboardCoins,
     DR.currentView=DR.Dashboard,
     DR.errorMessage="",
     DR.searchStr="",
@@ -42,23 +51,25 @@ main = do
     DR.vContext=vCtx
   }
 
-  let refreshIntervalSecs = 30 -- interval (in seconds) to refresh data
+  let refreshIntervalSecs = 30 -- interval (in seconds) to refresh view data from DB
   C.forkIO $ viewsLoop vCtx
   C.forkIO $ mainLoop mCtx refreshIntervalSecs
   inputLoop vCtx
 
 
--- mainLoop refreshes the current state and UI every N seconds
+-- mainLoop refreshes the current dashboard data state every N seconds
 mainLoop :: DR.MContext -> Int -> IO ()
 mainLoop ctx ri = do
   Async.withAsync (DR.refresh ctx ((10 ^ 6) * ri)) $ \p -> do
     _ <- Async.wait p
     mainLoop ctx ri
 
+-- viewsLoop refreshes views every 1 second
 viewsLoop :: DR.VContext -> IO ()
 viewsLoop ctx = do
   IO.hFlush IO.stdout
   ANSI.clearFromCursorToScreenBeginning
+  ANSI.setCursorPosition 0 0
   Views.renderCurrentView ctx
   C.threadDelay (round (10 ^ 6)) -- delay for 1 second for smooth refreshing
   viewsLoop ctx
@@ -71,6 +82,7 @@ loading interval = do
     IO.putChar '.'
     )
 
+-- inputLoop main method receiving user input of main app commands
 inputLoop :: DR.VContext -> IO ()
 inputLoop ctx = do
   putStrLn ""
@@ -90,12 +102,11 @@ inputLoop ctx = do
       _   -> do C.forkIO $ DR.setErrorMessage "Type '?' for all available cmds" ctx; return ()
     inputLoop ctx
 
+-- coinLookUp receives user input for coin lookup searches
 coinLookUp :: DR.VContext -> IO ()
 coinLookUp ctx = do
   IO.hSetBuffering IO.stdin IO.LineBuffering
-  -- IO.hSetEcho IO.stdin False
   input <- getLine
-  putStrLn $ "Input" ++ input
   if null input then coinLookUp ctx
   else do
     case head input of

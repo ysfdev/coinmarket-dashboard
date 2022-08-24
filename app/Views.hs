@@ -19,6 +19,8 @@ import Data.Aeson.Types (Value (..), Result (..), emptyObject)
 import qualified Control.Monad.Cont as IO
 import Data.Maybe (isNothing)
 import qualified Control.Concurrent as IO
+import qualified System.Console.ANSI as ANSI
+import qualified Data.ByteString as T
 
 type ScreenWidth = Int
 
@@ -48,14 +50,12 @@ displayCtxErrorMsg ctx = do
 
 printHelp :: IO ()
 printHelp = do
-  putStrLn ""
-  putStrLn "Available Commands: "
-  putStrLn ""
-  putStrLn "      D             Invoke the main dashboard     ; displays the top 10 coins"
-  putStrLn "      C <tickerID>  Invoke the detailed coin view ; displays details about a specific coin"
-  putStrLn "      ?             Invoke the help menu          ; displays all available commands"
-  putStrLn "      Q             Quit the application"
-  putStrLn ""
+  putStrLn "\n\
+   \Available Commands: \n\
+   \      D             Invoke the main dashboard     ; displays the top 10 coins \n\
+   \      C <tickerID>  Invoke the detailed coin view ; displays details about a specific coin \n\
+   \      ?             Invoke the help menu          ; displays all available commands \n\
+   \      Q             Quit the application"
 
 verticalHelp :: IO ()
 verticalHelp = putStrLn "Available Commands: D (Dashboard), C (Coin Search), Q (Quit), ? (Help)"
@@ -70,12 +70,21 @@ printDashoard ctx sw topCoins = do
   putStrLn ""
   let slotsLength = calcSlotsLength sw $ length dashboardRowsHeader
   case topCoins of
-    CD.GcrNotFoundError    -> putStrLn "Unexpected Database Error" -- TODO: setErrorMessage in context
-    CD.GcrUnexpectedError  -> putStrLn "Unexpected Server Error" -- TODO: setErroMessage in context
+    CD.GcrNotFoundError    -> do 
+      putStrLn "Unexpected Database Error" -- TODO: setErrorMessage in context
+      footer
+    CD.GcrUnexpectedError  -> do
+      putStrLn "Unexpected Server Error" -- TODO: setErroMessage in context
+      footer
     CD.GcrCoinList coins   -> do
-      putStrLn . showRow . addPadding slotsLength $ rowNameLength dashboardRowsHeader
-      putStrLn $ rowSeparator slotsLength
-      (putStrLn . unlines . interleave (rowSeparator slotsLength)) (map (showRow . ((addPadding slotsLength . rowNameLength) . showCoin)) (V.toList coins))
+      putStrLn . showRow . addPadding slotsLength $ rowNameLength dashboardRowsHeader -- header row
+      putStrLn $ rowSeparator slotsLength -- line breaker
+      -- display coins data
+      (putStrLn . 
+        unlines . -- combine all lines to single sting
+        interleave (rowSeparator slotsLength)) 
+        (map (showRow . ((addPadding slotsLength . rowNameLength) . showCoin)) 
+        (V.toList coins))
       footer
 
 -- Show a Coin as a list of Strings
@@ -167,9 +176,9 @@ searchTypeToStr p =
 searchStyleToStr :: CD.CoinLookupParams -> String
 searchStyleToStr p = 
   case CD.clpSearchStyle p of 
-    CD.CtssContain -> "contain"
-    CD.CtssEnd     -> "end with"
-    CD.CtssBegin   -> "begin with"
+    CD.CtssContain -> "containing"
+    CD.CtssEnd     -> "ending with"
+    CD.CtssBegin   -> "beginning with"
 
 buildSearchTerm :: Char -> String -> CD.CoinLookupSearchData
 buildSearchTerm sType sStr =
@@ -188,18 +197,17 @@ buildSearchStyle sStyle =
 
 coinLookupMenu :: IO ()
 coinLookupMenu = do
-  let output = "\n\
-   \ ++++++++++++++++++++++++++++++++++++++++++++++++++++++ \n\
-    \             ADVANCED COIN SEARCH                      \n\ 
+  putStrLn "\n\
+    \ ++++++++++++++++++++++++++++++++++++++++++++++++++++++ \n\
+    \             ADVANCED COIN SEARCH                       \n\ 
     \ ------------------------------------------------------ \n\
-    \ Search Type: S(Symbol), N(Name) L(Slug) \n\
-    \ Search Style: B(Begins With), C(Contains), E(Ends With) \n\
-    \ Usage: (SearchType.SearchTyle SearchTerm) \n\
+    \ Search Type: S(Symbol), N(Name) L(Slug)                \n\
+    \ Search Style: B(Begins With), C(Contains), E(Ends With)\n\
+    \ Usage: (SearchType.SearchTyle SearchTerm)              \n\
        \ > (s.b btc), Searches a Symbol Beggining with 'btc' \n\
-       \ > (n.c ada), Searches a Name that contains 'ada' \n\
-    \ ++++++++++++++++++++++++++++++++++++++++++++++++++++++ \n\ 
-    \Enter Search Term or q to go back:"
-  putStrLn output
+       \ > (n.c ada), Searches a Name that contains 'ada'    \n\
+    \ ++++++++++++++++++++++++++++++++++++++++++++++++++++++ "
+  putStr "Enter Search Term or q to go back: "
 
 showCoinInfo :: CD.Coin -> String
 showCoinInfo c =

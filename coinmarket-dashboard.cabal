@@ -45,6 +45,7 @@ executable coinmarket-dashboard
         Views
         TestCoinData
         TestCoinDataStorage
+        TestDataRefresher
 
     -- LANGUAGE extensions used by modules in this package.
     other-extensions:
@@ -67,11 +68,13 @@ executable coinmarket-dashboard
         ,terminal-size ^>=0.3.3
         ,text
         ,vector
+        ,time
 
     hs-source-dirs:
         app
         test
         test/CoinData
+        test/integration
 
     default-language: Haskell2010
 
