@@ -28,8 +28,12 @@ main :: IO ()
 main = do
   IO.hSetBuffering IO.stdout IO.NoBuffering
   IO.hSetBuffering IO.stdin IO.NoBuffering
+  ANSI.clearFromCursorToScreenBeginning
+  ANSI.setCursorPosition 0 0
   ANSI.setTitle "CoinMarketDashboard"
   putStrLn "Welcome, CoinMarket Dashboard"
+  C.threadDelay (round (10 ^ 6)*3) -- delay for 3 seconds to welcome the user
+  ANSI.clearFromCursorToScreenBeginning
   db <- CDS.initializeDB _dbLoc
   storeRefreshedAt <- TM.getCurrentTime
   sCtx <- C.newMVar DR.StorageContext { 
@@ -45,6 +49,7 @@ main = do
     DR.currentView=DR.Dashboard,
     DR.errorMessage="",
     DR.searchStr="",
+    DR.changeCount=1, -- set to 1 so we immediatley render the initial view
     DR.sContext=sCtx
   }
   mCtx <- C.newMVar DR.Context {
@@ -68,10 +73,8 @@ mainLoop ctx ri = do
 viewsLoop :: DR.VContext -> IO ()
 viewsLoop ctx = do
   IO.hFlush IO.stdout
-  ANSI.clearFromCursorToScreenBeginning
-  ANSI.setCursorPosition 0 0
   Views.renderCurrentView ctx
-  C.threadDelay (round (10 ^ 6)) -- delay for 1 second for smooth refreshing
+  C.threadDelay (round (10 ^ 4)) -- delay for 10 ms for responsive transitioning
   viewsLoop ctx
 
 -- loading displays loading N dots every given interval
