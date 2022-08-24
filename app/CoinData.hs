@@ -12,6 +12,7 @@ module CoinData
 , GetCoinsResult (..)
 , coinLookup
 , top10Coins
+, topNCoins
 ) where
 
 import Data.Map (Map)
@@ -62,3 +63,8 @@ getCoins sCtx (GetCoinsParams limit sortProp _ unit) =
 -- Fetch the top ten coins from the local store
 top10Coins :: DR.SContext -> IO GetCoinsResult
 top10Coins sCtx = getCoins sCtx (GetCoinsParams {_gcpLimit=10, _gcpSortBy=CoinCmcRank, _gcpFilterBy=CoinId, _gcpUnit="USD"})
+
+-- Fetch the top N coins from the local store
+topNCoins :: DR.SContext -> Int -> IO GetCoinsResult
+topNCoins sCtx n = getCoins sCtx (GetCoinsParams {_gcpLimit=n, _gcpSortBy=CoinCmcRank, _gcpFilterBy=CoinId, _gcpUnit="USD"})
+

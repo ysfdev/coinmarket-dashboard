@@ -1,6 +1,14 @@
 # coinmarket-dashboard
 
-CLI-based crypto coins market prices dashboard
+Haskell CLI crypto coins market prices dashboard. 
+
+**Note: this only inital beta(subject to change)**
+## Main Features 
+
+Live market data refreshed every `60` seconds from CoinMarketCap.
+
+- Query info about some coin (current price, day high/low open/close, etc)
+- Dashboard displaying latest top 15 coins
 
 ## Run App
 
@@ -16,8 +24,12 @@ cabal run coinmarket-dashboard
 cabal install && cabal configure --enable-tests
 ```
 
-### Run Uni Tests
+### Run Unit Tests
 
 ```bash
 cabal test
 ```
+
+## Contributors 
+
+Yeramin (@ysfdev), Kenley (@registerzero), Andres (@OneHoax)
