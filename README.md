@@ -2,6 +2,13 @@
 
 CLI-based crypto coins market prices dashboard
 
+## Main Features 
+
+Live market data refreshed every `60` seconds
+
+- Query info about some coin (current price, day high/low open/close, etc)
+- Dashboard displaying latest top 15 coins
+
 ## Run App
 
 ```bash
