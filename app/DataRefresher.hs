@@ -15,6 +15,7 @@ module DataRefresher
 , updateSearchStr
 , setErrorMessage
 , clearErrorMessage
+, resetSearchParams
 ) where
 
 import qualified Control.Concurrent as C
@@ -54,10 +55,15 @@ updateCurrentView name ctx = do
   vCtx <- readVCtx ctx
   writeVCtx ctx vCtx { currentView=name} 
 
-updateSearchStr :: String -> VContext -> IO ()
-updateSearchStr s ctx = do
+updateSearchStr :: VContext -> String  -> IO ()
+updateSearchStr ctx sStr = do
   vCtx <- readVCtx ctx
-  writeVCtx ctx vCtx { searchStr=s} 
+  writeVCtx ctx vCtx { searchStr=sStr } 
+
+resetSearchParams :: VContext -> IO ()
+resetSearchParams ctx = do
+  vCtx <- readVCtx ctx
+  writeVCtx ctx vCtx { searchStr=""} 
 
 setErrorMessage :: String -> VContext -> IO ()
 setErrorMessage s ctx = do

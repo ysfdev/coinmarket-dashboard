@@ -43,6 +43,7 @@ data CoinTextSearchStyle =
     CtssBegin     -- Begins with search term
   | CtssEnd       -- Ends with search term
   | CtssContain   -- Contains search term
+  deriving (Show)
 
 data CoinLookupSearchData = 
   -- (text search based on name)
@@ -58,6 +59,7 @@ data CoinLookupParams = CoinLookupParams
     clpSearchData :: CoinLookupSearchData
   , clpSearchStyle :: CoinTextSearchStyle
   }
+  deriving (Show)
 
 data CoinLookupResult = ClrCoin {_clrGetCoin :: Coin} | ClrNotFoundError | ClrUnexpectedError
   deriving (Show)

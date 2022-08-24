@@ -25,8 +25,8 @@ _dbLoc = "./coin.db"
 
 main :: IO ()
 main = do
-  IO.hSetBuffering IO.stdout IO.NoBuffering 
-  IO.hSetBuffering IO.stdin IO.NoBuffering 
+  IO.hSetBuffering IO.stdout IO.NoBuffering
+  IO.hSetBuffering IO.stdin IO.NoBuffering
   putStrLn "Welcome, CoinMarket Dashboard"
   db <- CDS.initializeDB _dbLoc
   sCtx <- C.newMVar DR.StorageContext { DR.storageHandle = db }
@@ -36,7 +36,7 @@ main = do
     DR.currentView=DR.Dashboard,
     DR.errorMessage="",
     DR.searchStr="",
-    DR.sContext = sCtx
+    DR.sContext=sCtx
   }
   mCtx <- C.newMVar DR.Context {
     DR.vContext=vCtx
@@ -79,26 +79,30 @@ inputLoop ctx = do
   do
     let input = toLower cmd
     case input of
-      'd' -> do DR.updateCurrentView DR.Dashboard ctx
-      'c' -> do 
+      'd' -> do 
+        DR.updateCurrentView DR.Dashboard ctx
+        DR.resetSearchParams ctx
+      'c' -> do
         DR.updateCurrentView DR.CoinLookUp ctx
         coinLookUp ctx
       '?' -> do DR.updateCurrentView DR.Help ctx
       'q' -> exitSuccess
-    
       _   -> do C.forkIO $ DR.setErrorMessage "Type '?' for all available cmds" ctx; return ()
     inputLoop ctx
 
-coinLookUp :: DR.VContext -> IO () 
+coinLookUp :: DR.VContext -> IO ()
 coinLookUp ctx = do
   IO.hSetBuffering IO.stdin IO.LineBuffering
-  IO.hSetEcho IO.stdin False
+  -- IO.hSetEcho IO.stdin False
   input <- getLine
-  case head input of
-    'q' -> do 
-      IO.hSetBuffering IO.stdin IO.NoBuffering
-      DR.updateCurrentView DR.Dashboard ctx
-    _ -> do 
-      DR.updateSearchStr input ctx
-      DR.updateCurrentView DR.CoinLookUp ctx
-      coinLookUp ctx
+  putStrLn $ "Input" ++ input
+  if null input then coinLookUp ctx
+  else do
+    case head input of
+      'q' -> do 
+        IO.hSetBuffering IO.stdin IO.NoBuffering
+        DR.updateCurrentView DR.Dashboard ctx
+      _ -> do
+        DR.updateSearchStr ctx input
+        DR.updateCurrentView DR.CoinLookUp ctx
+        coinLookUp ctx
