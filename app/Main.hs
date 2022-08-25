@@ -74,7 +74,7 @@ viewsLoop :: DR.VContext -> IO ()
 viewsLoop ctx = do
   IO.hFlush IO.stdout
   Views.renderCurrentView ctx
-  C.threadDelay (round (10 ^ 6)) -- delay for 1 second for smooth refreshing
+  C.threadDelay (round (10 ^ 4)) -- delay for 10 ms for responsive transitioning
   viewsLoop ctx
 
 -- loading displays loading N dots every given interval
