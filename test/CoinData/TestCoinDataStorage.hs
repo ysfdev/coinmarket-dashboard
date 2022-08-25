@@ -50,52 +50,28 @@ testInitAndInsertMultipleQuotes =
     Nothing -> putStrLn "failed to pars coin" >> DB.close db
     Just vc -> insertCoins db vc >> DB.close db
 
-testCoinRowStrListGenerator :: IO (Result (Vector [String]))
-testCoinRowStrListGenerator = 
-  case toArrayFromString _sampleCoinListData of
-    Error err -> putStrLn err >> return (Error err)
-    Success vc -> return $ V.mapM _getCoinRowValList vc
-
-testCoinRowValStrListGenerator :: IO (Result (Vector String))
-testCoinRowValStrListGenerator = 
-  case toArrayFromString _sampleCoinListData of
-    Error err -> putStrLn err >> return (Error err)
-    Success vc -> return $ V.mapM _getCoinRowValStr vc
-
-testProcessCoinsForInsert :: IO ()
-testProcessCoinsForInsert =
-  case toArrayFromString _sampleCoinListData of
-    Error err -> putStrLn err
-    Success vc -> 
-      putStrLn ("processing " ++ show (V.length vc) ++ " coins...") >> let
-      (cs,qs) = foldr _processCoinsForInsert ("","") vc in
-      putStr ("Coins:" <+> cs <+> "Quotes:" <+> qs)
-
-testBuildInsertStatement = 
-  case toArrayFromString _sampleCoinListData of
-    Error err -> putStrLn err
-    Success vc -> putStr (T.unpack (_buildInsertStatemnt vc))
-
-testBuildInsert1Statement = 
-  case V.take 1 <$> toArrayFromString _sampleCoinListData of
-    Error err -> putStrLn err
-    Success vc -> putStr (T.unpack (_buildInsertStatemnt vc))
-
-testBuildInsertStatementMultipleQuotes =
-  case V.fromList.(:[]) <$> (decode $ toBStr _sampleCoinData1 :: Maybe Coin)  of
-    Nothing -> putStrLn "failed to pars coin"
-    Just vc -> putStr (T.unpack (_buildInsertStatemnt vc))
-
 testBuildInsertStatmentValList :: IO ()
 testBuildInsertStatmentValList = 
   case toArrayFromString _sampleCoinListData of
     Error err -> putStrLn err
-    Success vc -> mapM_ (\v -> putStr (show v <> "\n\n\n")) (_buildInsertStatmentValList vc)
+    Success vc -> mapM_ (\v -> putStr (show v <> "\n")) (_buildInsertStatementValList vc)
+
+testBuilInsertQuoteStatementValList :: IO ()
+testBuilInsertQuoteStatementValList =
+  case toArrayFromString _sampleCoinListData of
+    Error err -> putStrLn err
+    Success vc -> mapM_ (\v -> putStr (show v <> "\n")) (snd._buildQuoteInsertStatmentValList $ vc)
+
+testBuilInsertMultiQuoteCoinStatementValList :: IO ()
+testBuilInsertMultiQuoteCoinStatementValList = 
+  case (decode $ toBStr _sampleCoinData1 :: Maybe Coin) of
+    Nothing -> putStrLn "ERROR: Failed to parse multiquote coin!"
+    Just vc -> mapM_ (\v -> putStr (show v <> "\n")) (mconcat <$> snd (_buildQInsertRowValList 1 vc))
 
 testFetchTopNCoins = let
   qUnit = "USD"
   limit = 10 
-  sortProp = CoinSymbol in 
+  sortProp = CoinId in 
   initializeDB _dbLocation >>= \db ->
   fetchTopNCoins db qUnit limit sortProp
 
@@ -111,7 +87,7 @@ testInsertCoins =
     Success vc -> let
       numCoins = V.length vc in
       initializeDB _dbLocation >>= \db ->
-      insertCoins' db vc >>
+      insertCoins db vc >>
       DB.changes db >>= \numChanges ->
       DB.close db >>
       putStrLn (show numChanges <> " rows changed out of " <> show numCoins <> " requested") >>
@@ -128,7 +104,7 @@ _coinTestStatement sortCol = DBD.Utf8 $ toSBStr $
 
 testPrepareStatement = let 
   searchProp = CoinSlug in
-  case _getPropName searchProp of
+  case _getDBScopedPropName searchProp of
     Nothing -> print "Failed to find name for prop"
     Just searchCol ->
       initializeDB _dbLocation >>= \db ->
@@ -138,10 +114,10 @@ testPrepareStatement = let
         [
            (toText ":search",  toSQLText "Car%")
         ] >>
-      trace "testStatement -- calling _processResults" _processResults stmt M.empty >>= \cs ->
+      trace "testStatement -- calling _processResults" _processResults stmt V.empty >>= \cs ->
       DB.finalize stmt >>
       DB.close db >>
-      print (M.take 10 cs)
+      print (V.take 10 cs)
 
 testDataClientIntegration :: IO Bool
 testDataClientIntegration =let

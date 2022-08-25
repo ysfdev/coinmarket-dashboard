@@ -21,6 +21,13 @@ import qualified Data.Aeson.Key as T
 import CoinDataTypes
 import qualified CoinDataTypes as CoinId
 
+
+-- Why? Becuase - Success "1" <> Success "2" <> Success "3" yeilds Success "1"
+(<:>) :: Semigroup a => Result a -> Result a -> Result a
+(<:>) = appendResult
+appendResult :: Semigroup a => Result a -> Result a -> Result a
+appendResult ra rb = ra >>= \a-> rb >>= \b-> return (a<>b)
+
 fromBStr :: BL.ByteString -> String
 fromBStr = TL.unpack.TLE.decodeUtf8
 
@@ -182,14 +189,6 @@ data CoinFieldSchema = CoinFieldSchema
   , _cfsStorage :: CoinStorageType
   , _cfsRequired :: CoinFieldRequired
   }
-
-_getPropName :: CoinProperty -> Maybe String
-_getPropName prop =
-  case M.lookup prop _coinPropMap of
-    Just schema -> Just $ _cfsFieldName schema
-    Nothing -> case M.lookup prop _coinQPropMap of
-      Nothing -> Nothing
-      Just schema -> Just $ _cfsFieldName schema
 
 -- coin schema declarations - could be moved to a json config file
 

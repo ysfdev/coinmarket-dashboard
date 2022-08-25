@@ -29,6 +29,7 @@ import Data.Aeson.Types
 trace _ a = a
 
 toSQLText = DB.SQLText . toText
+toSQLInteger = DB.SQLInteger
 
 coinStorageTypeToSQLType :: CoinStorageType -> DB.ColumnType
 coinStorageTypeToSQLType cs = case cs of
@@ -49,6 +50,31 @@ fromSQLText     v = case v of DB.SQLText     s -> Just s;_->Nothing
 fromSQLBlob :: DB.SQLData -> Maybe BS.ByteString
 fromSQLBlob     v = case v of DB.SQLBlob     bs -> Just bs;_->Nothing
 
+coinPropValSQLData :: Object -> CoinFieldSchema -> Result DB.SQLData
+coinPropValSQLData o schema =
+    case parse (.:: _cfsFieldName schema) o :: Result Value of
+    Error err -> case _cfsRequired schema of
+      CfRequired -> Error err
+      CfOptional -> Success DB.SQLNull -- return "null" for optional fields
+    Success v -> case v of
+      Object o -> Success $ DB.SQLBlob . toSBStr.fromBStr $ encode o
+      Array a -> Success $ DB.SQLBlob . toSBStr.fromBStr $ encode a
+      String s -> Success $ DB.SQLText s
+      Number n -> Success $
+        if _cfsStorage schema == CstInteger then DB.SQLInteger (floor n) -- make sure int types have no decimals
+        else DB.SQLFloat $ SC.toRealFloat n
+      Bool b -> Success $ DB.SQLInteger $ if b then 1; else 0
+      Null -> Success DB.SQLNull
+
+_getDBScopedPropName :: CoinProperty -> Maybe String
+_getDBScopedPropName prop =
+  case M.lookup prop _coinPropMap of
+    Just schema -> Just $ "coindata." <> _cfsFieldName schema
+    Nothing -> case M.lookup prop _coinQPropMap of
+      Nothing -> Nothing
+      Just schema -> Just $ "quotedata." <> _cfsFieldName schema
+
+--- for debugging ---
 translateErrors :: DB.Error -> String
 translateErrors e = case e of
   DB.ErrorOK                  -> "Successful result"
@@ -82,22 +108,6 @@ translateErrors e = case e of
   DB.ErrorWarning             -> "Warnings from sqlite3_log()"
   DB.ErrorRow                 -> "sqlite3_step() has another row ready"
   DB.ErrorDone                -> "sqlite3_step() has finished executing"
-
-coinPropValSQLData :: Object -> CoinFieldSchema -> Result DB.SQLData
-coinPropValSQLData o schema =
-    case parse (.:: _cfsFieldName schema) o :: Result Value of
-    Error err -> case _cfsRequired schema of
-      CfRequired -> Error err
-      CfOptional -> Success DB.SQLNull -- return "null" for optional fields
-    Success v -> case v of
-      Object o -> Success $ DB.SQLBlob . toSBStr.fromBStr $ encode o
-      Array a -> Success $ DB.SQLBlob . toSBStr.fromBStr $ encode a
-      String s -> Success $ DB.SQLText s
-      Number n -> Success $
-        if _cfsStorage schema == CstInteger then DB.SQLInteger (floor n) -- make sure int types have no decimals
-        else DB.SQLFloat $ SC.toRealFloat n
-      Bool b -> Success $ DB.SQLInteger $ if b then 1; else 0
-      Null -> Success DB.SQLNull
 
 _createCoinDataTable = [qq|
 create table if not exists coindata
@@ -159,9 +169,9 @@ _createIndexes = _createCoinDataIndexes <> _createQuoteDataIndexes
 
 _createTables = _createCoinDataTable <> _createQuoteDataTable
 
-_clearTables = [qq|
-delete from coindata;
-delete from quotedata;
+_dropTables = [qq|
+drop table if exist coindata;
+drop table if exist quotedata;
 |]
 
 _initPrologue = [qq|
@@ -171,6 +181,7 @@ pragma foreign_keys = ON; /*turn on foreign key constraints*/
 
 _initBody :: [Char]
 _initBody = "/* Database initialization Prologue */\n"
+  -- <> _dropTables
   <> _createTables
   <> _createIndexes
 
@@ -206,6 +217,35 @@ _coinSQLColTypes = map (Just . coinStorageTypeToSQLType._cfsStorage) _coinSQLSch
 _coinNumSQLCols = length _coinSQLColTypes
 _coinColNamedParamsList = map (\sc->":"<>_cfsFieldName sc) _coinSQLSchema
 
+
+-- SQL Coin Insert Functions --
+_coinInsertHeader = "insert or replace into coindata "
+  <> _coinColStr
+  <> "\nvalues\n"
+
+_coinQInsertHeader = "insert or replace into quotedata "
+  <> _coinQColStr
+  <> "\nvalues\n"
+
+_buildInsertRowValList :: Int -> Coin -> Result [(Text, DB.SQLData)]
+_buildInsertRowValList idx c = mapM (\schm -> 
+  let rvp = coinPropValSQLData (_coinJSON c) schm in
+    case rvp of
+      Error err -> Error err 
+      Success vp -> Success (T.pack $ ":"<>_cfsFieldName schm<>"_"<>show idx,vp)) $ M.elems _coinPropMap
+
+_buildInsertStatementValList :: Vector Coin -> [(Text, DB.SQLData)]
+_buildInsertStatementValList vc = snd $
+  foldl (\(idx,acc) c -> case _buildInsertRowValList idx c of
+      Error err -> trace ("_buildInsertStatementValList -- skipping insert value row -- " <> err) (idx,acc)
+      Success tpv -> (idx+1,acc<>tpv)) (1,[]) vc
+
+_coinInsertStatement :: Int -> DBD.Utf8
+_coinInsertStatement n = DBD.Utf8 $ toSBStr $
+      _coinInsertHeader
+  <>  _buildInsertStatementNamedParamList n
+  <>  ";"
+
 --- SQL Quote Column Info ---
 _coinQSQLSchema = M.elems _coinQPropMap <>
   [
@@ -217,68 +257,36 @@ _coinQSQLColTypes = map (Just . coinStorageTypeToSQLType._cfsStorage) _coinQSQLS
 _coinQNumSQLCols = length _coinQSQLColTypes
 _coinQColNamedParamsList = map (\sc->":"<>_cfsFieldName sc) _coinQSQLSchema
 
--- mapM function to get values, over json keys
-_getCoinRowValList :: Coin -> Result [String]
-_getCoinRowValList c = mapM (__coinPropValStr $ _coinJSON c) $ M.elems _coinPropMap
+_buildInsertQuoteStatementNamedParamList :: Int -> String
+_buildInsertQuoteStatementNamedParamList n = if n > 0 then
+  snd (foldl (\(idx,acc) cs->(idx+1,acc <> ",\n" <> "(" <> _buildNamedParamRow (idx,cs) <> ")")) 
+  (2,"(" <> _buildNamedParamRow (1,_coinQColNamedParamsList) <> ")")
+  (replicate (n-1) _coinQColNamedParamsList))
+  else ""
 
--- create a string containing the list of quote rows associated with the given coin id
--- quotes that fail to parse are dropped
-_getCoinQRowValStr :: Map String Object -> [Char] -> [Char]
-_getCoinQRowValStr qm cid  = let
-  qList = M.toList qm
-  makeQRowStrList obj = mapM (__coinPropValStr obj) $ M.elems _coinQPropMap
-  makeQRowStr (unit,obj) = let
-    s0 = foldl1 (\acc vstr -> acc <> "," <> vstr) <$> makeQRowStrList obj
-    s1 = mappend "(" <$> s0 in
-    (`mappend` ("," <> cid <> "," <> show unit <>")")) <$> s1
-  foldRows rows (unit, obj) =
-    case makeQRowStr (unit,obj) of
-      Error err -> trace ("error: " ++ err ++ ", parsing quote: " ++ unit ++ "-- for coin id: " ++ show cid) rows -- drop rows for objects with failed parse attempts
-      Success r -> rows<+>r
-  in foldl foldRows "" qList
+_buildQInsertRowValList :: Int -> Coin -> (Int, Result [[(Text, DB.SQLData)]])
+_buildQInsertRowValList idx0 c = let
+  qm = zip [idx0..] (M.toList (_quoteJSON c))
+  lastIdx = fst.last $ qm
+  rowList = mapM (\(idx,(unit,quote)) -> _coinId c >>= \cid -> let 
+    runit = return [(toText (":"<>_coinQUnitStr<>"_"<>show idx), toSQLText unit)]
+    rcid = return [(toText (":"<>_coinIdStr<>"_"<>show idx), toSQLInteger.fromIntegral $ cid)] in
+    mapM (\schm ->
+      case coinPropValSQLData quote schm of
+        Error err -> Error err 
+        Success vp -> Success (T.pack $ ":"<>_cfsFieldName schm<>"_"<>show idx,vp)) 
+    (M.elems _coinQPropMap) <:> rcid <:> runit) qm in (lastIdx,rowList)
 
--- foldl1 function to get val list, and mapM strings to list of value row strings 
-_getCoinRowValStr :: Coin -> Result String
-_getCoinRowValStr c = let
-  s0 = foldl1 (\acc rs -> acc <> "," <> rs) <$> _getCoinRowValList c
-  s1 = mappend "(" <$> s0 in
-  (`mappend` ")") <$> s1
+_buildQuoteInsertStatmentValList :: Vector Coin -> (Int,[(Text, DB.SQLData)])
+_buildQuoteInsertStatmentValList = foldl (\(idx,acc) c -> case _buildQInsertRowValList (idx+1) c of
+      (_,Error err) -> trace ("_buildQuoteInsertStatmentValList -- skipping insert value row -- " <> err) (idx,acc)
+      (nIdx, Success tpv) -> {-trace ("quotes processed: " <> show nIdx)-} (nIdx,acc<>mconcat tpv)) (0,[])
 
--- function for foldr - takes a coin and a tuple of string vectors, one for coins and the other for associated quotes
-_processCoinsForInsert c (cs, qs) =
-  case _getCoinRowValStr c of
-    Error err -> (cs,qs) -- skip coin
-    Success cr ->
-      case _coinId c of
-        Error err -> trace ("error: " ++ err ++ ", while getting coin id") (cs,qs) -- skip coin
-        Success cid ->
-          case _coinQuoteMap c of
-            Error err -> trace ("error: " ++ err ++ " getting quote map -- for coin id: " ++ show cid) (cs,qs) -- skip coin
-            Success qm ->
-              case _getCoinQRowValStr qm (show cid) of
-                "" -> trace ("empty quote data -- for coin id: " ++ show cid) (cs,qs) -- skip coin - can't use coins with no quote data
-                qr -> (cs <+> cr, qs <+> qr)
-
-
-_coinInsertHeader = "insert or replace into coindata "
-  <> _coinColStr
-  <> "\nvalues\n"
-
-_coinQInsertHeader = "insert or replace into quotedata "
-  <> _coinQColStr
-  <> "\nvalues\n"
-
-_buildInsertStatemnt vc = let
-  (cs,qs) = foldr _processCoinsForInsert ("","") vc
-  transactionHeader = "begin transaction;\n"
-  coinStatment = _coinInsertHeader <> cs <> ";\n"
-  coinQStatement = _coinQInsertHeader <> qs <> ";\n"
-  transactionFooter = "commit;\n" in
-  toText $
-  transactionHeader
-  <> coinStatment
-  <> coinQStatement
-  <> transactionFooter
+_coinQInsertStatement :: Int -> DBD.Utf8
+_coinQInsertStatement n = DBD.Utf8 $ toSBStr $
+      _coinQInsertHeader
+  <>  _buildInsertQuoteStatementNamedParamList n
+  <>  ";"
 
 _buildNamedParamRow :: (Int,[String]) -> String
 _buildNamedParamRow (_,[]) = ""
@@ -291,30 +299,7 @@ _buildInsertStatementNamedParamList n = if n > 0 then
   (replicate (n-1) _coinColNamedParamsList))
   else ""
 
-_buildInsertRowValList :: Int -> Coin -> Result [(Text, DB.SQLData)]
-_buildInsertRowValList idx c = mapM (\schm -> 
-  let rvp = coinPropValSQLData (_coinJSON c) schm in
-    case rvp of
-      Error err -> Error err 
-      Success vp -> Success (T.pack $ ":"<>_cfsFieldName schm<>"_"<>show idx,vp)) $ M.elems _coinPropMap
-
-_buildInsertStatmentValList :: Vector Coin -> [(Text, DB.SQLData)]
-_buildInsertStatmentValList vc = snd $
-  foldl (\(idx,acc) c -> case _buildInsertRowValList idx c of
-      Error err -> trace ("_buildInsertStatmentValList -- skipping insert value row -- " <> err) (idx,acc)
-      Success tpv -> (idx+1,acc<>tpv)) (1,[]) vc
-
-_coinInsertStatement :: Int -> DBD.Utf8
-_coinInsertStatement n = DBD.Utf8 $ toSBStr $
-      _coinInsertHeader
-  <>  _buildInsertStatementNamedParamList n
-  <>  ";"
-
-_coinQInsertStatement :: Int -> DBD.Utf8
-_coinQInsertStatement n = DBD.Utf8 $ toSBStr $
-      _coinQInsertHeader
-  <>  _buildInsertStatementNamedParamList n
-  <>  ";"
+--- SQL Result handling functions ---
 
 _coinTopNStatement :: String -> DBD.Utf8
 _coinTopNStatement sortCol = DBD.Utf8 $ toSBStr $
@@ -326,16 +311,31 @@ _coinTopNStatement sortCol = DBD.Utf8 $ toSBStr $
   <>  sortCol
   <>  ";"
 
+_coinTopNStatement' :: String -> DBD.Utf8
+_coinTopNStatement' sortCol = DBD.Utf8 $ toSBStr $
+      "select "
+  <>  _coinSQLColStr
+  <>  " from coindata inner join quotedata on coindata.id = quotedata.id and quotedata.unit = :unit order by "
+  <>  sortCol
+  <>  " limit :limit;"
+
 _coinLookupStatement :: String -> DBD.Utf8
 _coinLookupStatement searchCol = DBD.Utf8 $ toSBStr $
       "select "
   <>  _coinSQLColStr
   <>  ", "
   <>  _coinQSqlColStr
-  <>  " from coindata inner join quotedata on coindata.id = quotedata.id where "
+  <>  " from coindata where "
   <>  searchCol
   <>  " like :search order by cmc_rank;"
 
+_coinLookupStatement' :: String -> DBD.Utf8
+_coinLookupStatement' searchCol = DBD.Utf8 $ toSBStr $
+      "select "
+  <>  _coinSQLColStr
+  <>  " from coindata where "
+  <>  searchCol
+  <>  " like :search order by cmc_rank;"
 
 _nullOnOptional val req k =
   if req == CfRequired then val
@@ -366,54 +366,19 @@ _getRowObject kvs (sqldata,schema) = let
       _-> _nullOnOptional kvs propReq propKey
     DB.SQLNull -> kvs <> [propKey.=Null]
 
-_getNextCol :: DB.Statement -> Map Int Coin -> IO (Map Int Coin)
-_getNextCol stmt cs0 = let
-  colTypes = _coinSQLColTypes <> _coinQSQLColTypes
-  schemaList = _coinSQLSchema <> _coinQSQLSchema in
-  DB.typedColumns stmt colTypes >>= \sqlData -> let
-  (cCols, qCols) = splitAt _coinNumSQLCols sqlData
-  (cColInfo,qColInfo) =
-    (
-      zip cCols _coinSQLSchema
-    , zip qCols _coinQSQLSchema
-    )
-  (mrank,cs1) = let 
-      x = foldl _getRowObject [] cColInfo 
-      y = x <> [_coinQuoteKey .= object []]
-      z = parse parseJSON (object y) :: Result Coin in
-      case z of 
-        Error err -> trace ("skip this coin -- " <> err) (Nothing,cs0) -- skip this coin 
-        Success coin -> case (_coinId coin, _coinCmcRank coin) of
-          (Error err1, Error err2) -> trace ("skip this coind -- " <> err1 <> "\n" <> err2) (Nothing,cs0)
-          (Error err1, _) -> trace ("skip this coind -- " <> err1) (Nothing,cs0)
-          (_, Error err2) -> trace ("skip this coind -- " <> err2) (Nothing,cs0)
-          (Success cid, Success rank) -> 
-            case M.lookup rank cs0 of
-              Nothing -> (Just rank, M.insert rank coin cs0)
-              Just v -> (Nothing,cs0)
-  cs2 = 
-    if null cs1 then M.empty
-    else case (mrank) of 
-      Just rank -> let
-        x = foldl _getRowObject [] qColInfo 
-        y = parse parseJSON (object x) :: Result Object 
-        z = M.lookup rank cs1
-        in case (y,z) of
-          (Success q1,Just c0) ->
-            case __coinPropVal q1 _coinQUnitStr :: Result String of
-              Error err -> trace ("failed to get unit for quote -- " <> err) cs1 -- skip this coin
-              Success unit -> let
-                qm0 = _quoteJSON c0
-                qm1 =
-                  if null qm0 then M.fromList [(unit,q1)]
-                  else M.insert unit q1 qm0
-                c1 = c0 {_quoteJSON = qm1}
-                in M.insert rank c1 cs1
-          _ -> trace ("skip the quote - we must've skipped the coin above") cs1 -- skip the quote - we must've skipped the coin above
-      _ -> cs1
-  in return cs2
+_getNextCol :: DB.Statement -> Vector Coin -> IO (Vector Coin)
+_getNextCol stmt cs0 =
+  DB.typedColumns stmt _coinSQLColTypes >>= \sqlData -> let
+  cColInfo = zip sqlData _coinSQLSchema
+  cs1 = let 
+      kvs = foldl _getRowObject [] cColInfo 
+      mc = parse parseJSON (object kvs) :: Result Coin in
+      case mc of 
+        Error err -> trace ("skip this coin -- " <> err) cs0 -- skip this coin 
+        Success coin -> cs0 <> V.fromList [coin]
+  in return cs1
       
-_processResults :: DB.Statement -> Map Int Coin -> IO (Map Int Coin)
+_processResults :: DB.Statement -> Vector Coin -> IO (Vector Coin)
 _processResults stmt cs0 =
   DB.step stmt >>= \rslt ->
   if rslt == DB.Row then
