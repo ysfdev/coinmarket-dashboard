@@ -26,7 +26,20 @@ initializeDB dbLoc = DB.open (toText dbLoc) >>= \db ->
   return db
 
 insertCoins :: DB.Database -> Vector Coin -> IO ()
-insertCoins db vc = let 
+insertCoins db vc = catch(_exInsertCoins db vc) handleIt where
+  handleIt e =
+    case fromException e of
+      Just (DB.SQLError code details context) -> 
+        case (code,_matchErr _missingColumnErr details) of 
+          (DB.ErrorError,idx:_) -> -- attempt to handle schema changes
+            let sndHandler (SomeException e) = throwIO (CoinDataStorageError _insertFailureMsg) in
+            catch (__clearAndInit db) sndHandler >> -- attempt to drop tables and reinit db
+            catch (_exInsertCoins db vc) sndHandler -- try inserting one more time...
+          _ -> throwIO (CoinDataStorageError _insertFailureMsg)
+      _-> throwIO e
+
+_exInsertCoins :: DB.Database -> Vector Coin -> IO ()
+_exInsertCoins db vc = let 
   numCoins = V.length vc 
   coinList = _buildInsertStatementValList vc
   (numQuotes,qList) = _buildQuoteInsertStatmentValList vc in
@@ -41,10 +54,10 @@ insertCoins db vc = let
 
 fetchTopNCoins :: DB.Database -> String -> Int -> CoinProperty -> IO GetCoinsResult
 fetchTopNCoins db qUnit limit sortProp = catch (_exFetchTopNCoins db qUnit limit sortProp) handleIt where
-      handleIt e = 
-        case fromException e of
-          Just (DB.SQLError code details context) -> return GcrUnexpectedError
-          _-> throwIO e
+  handleIt e = 
+    case fromException e of
+      Just (DB.SQLError code details context) -> return GcrUnexpectedError
+      _-> throwIO e
 
 _exFetchTopNCoins :: DB.Database -> String -> Int -> CoinProperty -> IO GetCoinsResult
 _exFetchTopNCoins db qUnit limit sortProp =

@@ -9,6 +9,7 @@ import qualified Database.SQLite3 as DB
 import qualified Database.SQLite3.Direct as DBD
 import Control.Monad.IO.Class
 import Control.Monad.State.Class
+import Control.Exception
 
 --- Data imports ---
 
@@ -17,6 +18,8 @@ import qualified Data.Scientific as SC
 import qualified Data.ByteString as BS
 import Data.Text (Text)
 import qualified Data.Text as T
+import qualified Data.Text.Lazy as TL
+import qualified Data.Text.Internal.Lazy.Search as TLS
 import Data.Vector (Vector)
 import qualified Data.Vector as V
 import Data.Map (Map)
@@ -109,6 +112,19 @@ translateErrors e = case e of
   DB.ErrorRow                 -> "sqlite3_step() has another row ready"
   DB.ErrorDone                -> "sqlite3_step() has finished executing"
 
+_missingColumnErr = TL.pack "has no column named"
+_matchErr pattern errStr = TLS.indices pattern (TL.pack $ T.unpack errStr)
+_insertFailureMsg = TL.pack "Failed to insert coins. Try deleting the database and restarting the app."
+
+newtype CoinDataStorageError = CoinDataStorageError {
+  cdsErrorMsg :: TL.Text
+}
+
+instance Show CoinDataStorageError where
+  show (CoinDataStorageError err) = "CoinDataStorageError -- " <> show err
+
+instance Exception CoinDataStorageError
+
 _createCoinDataTable = [qq|
 create table if not exists coindata
 (
@@ -170,8 +186,8 @@ _createIndexes = _createCoinDataIndexes <> _createQuoteDataIndexes
 _createTables = _createCoinDataTable <> _createQuoteDataTable
 
 _dropTables = [qq|
-drop table if exist coindata;
-drop table if exist quotedata;
+drop table if exists coindata;
+drop table if exists quotedata;
 |]
 
 _initPrologue = [qq|
@@ -191,7 +207,11 @@ _initEpillogue = [qq|
 
 _initDB = toText $ _initPrologue <> _initBody <> _initEpillogue
 
--- data CoinInsert = CoinStorage
+__dropTables db = DB.exec db (toText _dropTables)
+
+__clearAndInit db =
+  __dropTables db >>
+  DB.exec db _initDB
 
 (<+>) :: [Char] -> [Char] -> [Char]
 (<+>) = sqlStmtRowAppend -- append a new row to a sql statment
