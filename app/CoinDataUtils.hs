@@ -21,6 +21,13 @@ import qualified Data.Aeson.Key as T
 import CoinDataTypes
 import qualified CoinDataTypes as CoinId
 
+
+-- Why? Becuase - Success "1" <> Success "2" <> Success "3" yeilds Success "1"
+(<:>) :: Semigroup a => Result a -> Result a -> Result a
+(<:>) = appendResult
+appendResult :: Semigroup a => Result a -> Result a -> Result a
+appendResult ra rb = ra >>= \a-> rb >>= \b-> return (a<>b)
+
 fromBStr :: BL.ByteString -> String
 fromBStr = TL.unpack.TLE.decodeUtf8
 
@@ -183,14 +190,6 @@ data CoinFieldSchema = CoinFieldSchema
   , _cfsRequired :: CoinFieldRequired
   }
 
-_getPropName :: CoinProperty -> Maybe String
-_getPropName prop =
-  case M.lookup prop _coinPropMap of
-    Just schema -> Just $ _cfsFieldName schema
-    Nothing -> case M.lookup prop _coinQPropMap of
-      Nothing -> Nothing
-      Just schema -> Just $ _cfsFieldName schema
-
 -- coin schema declarations - could be moved to a json config file
 
 _coinPropMap :: CoinPropMap
@@ -207,9 +206,10 @@ _coinPropMap = M.fromList
   , (CoinMaxSupply,                     CoinFieldSchema   "max_supply"                        CstReal     CfRequired)
   , (CoinLastUpdated,                   CoinFieldSchema   "last_updated"                      CstString   CfRequired)
   , (CoinDateAdded,                     CoinFieldSchema   "date_added"                        CstString   CfRequired)
-  -- , (CoinTags,                          CoinFieldSchema   "tags"                              CstArray    CfRequired)
+  , (CoinTags,                          CoinFieldSchema   "tags"                              CstArray    CfRequired)
   , (CoinSelfReportedCirculatingSupply, CoinFieldSchema   "self_reported_circulating_supply"  CstReal     CfOptional)
   , (CoinSelfReportedMarketCap,         CoinFieldSchema   "self_reported_market_cap"          CstReal     CfOptional)
+  , (CoinQuote,                         CoinFieldSchema   "quote"                             CstObject   CfRequired)
   ]
 
 _coinQPropMap :: CoinPropMap

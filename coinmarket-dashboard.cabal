@@ -63,6 +63,7 @@ executable coinmarket-dashboard
         ,direct-sqlite ^>=2.3.27
         ,http-conduit ^>=2.3.8
         ,mtl ^>=2.2.2
+        ,scientific ^>=0.3.7.0
         ,stm ^>=2.5.0.1
         ,template-haskell
         ,terminal-size ^>=0.3.3
